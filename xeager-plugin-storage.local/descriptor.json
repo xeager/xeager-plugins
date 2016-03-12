@@ -1,0 +1,9 @@
+{
+	"name": "storage.local",
+	"spi": {
+		"class": "com.xeager.platform.server.plugins.storage.local.LocalStoragePlugin",
+		"properties": {
+			"async": "false"
+		}
+	}
+}	

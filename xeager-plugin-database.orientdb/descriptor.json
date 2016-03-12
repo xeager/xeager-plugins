@@ -1,0 +1,26 @@
+{
+
+	"name": "database.orientdb",
+	
+	"title": "Database Plugin (Powered by OrientDb)",
+	"description": "Database Plugin (Powered by OrientDb)",
+	
+	"classpath": ["lib", "orientdb/lib"],
+	
+	"spi": {
+		"class": "com.xeager.platform.plugins.database.orientdb.OrientDatabasePlugin",
+		"properties": {
+			"server": "config/orientdb-server-config.xml",
+			"default": {
+				"user": "admin",
+				"password": "km030477",
+				"pool": {
+					"min": "20",
+					"max": "100"
+				}
+			},
+			"closable": "false"
+		}
+	}
+	
+}

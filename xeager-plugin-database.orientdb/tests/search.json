@@ -1,0 +1,21 @@
+{	
+	"select": ["*"],
+	"where": {
+		"account.uuid": "xxxxxx",
+		"and": {
+			"op": "or",	
+			"subject": 		{ "op": "like", "value": "%mehdi%" },
+			"note": 		{ 
+				"op": "in", "value": {
+					"entity": "connections",
+					"where": {
+						"alpha": "beta",
+						"gamma": "omega"
+					}
+				} 
+			}
+	    }
+	},
+	"start": "20",
+	"page": "25"
+}	

@@ -1,0 +1,15 @@
+{
+	"name": "http.jetty",
+	"spi": {
+		"class": "com.xeager.platform.plugins.impls.jetty.JettyHttpPlugin",
+		"properties": {
+			"port": "8080",
+			"context": "/",
+			"ssl": {
+				"port": "8443",
+				"keyStore": "xeager.jks",
+				"keyPassword": "xeager2014ks"
+			}
+		}
+	}
+}	

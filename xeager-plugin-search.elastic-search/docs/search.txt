@@ -1,0 +1,9 @@
+Setup Client Node
+https://www.elastic.co/guide/en/elasticsearch/client/java-api/current/node-client.html
+
+http://www.javased.com/?source_dir=EARQ/src/test/java/dev/ElasticSearchServer.java
+
+
+Indexing relations
+http://www.spacevatican.org/2012/6/3/fun-with-elasticsearch-s-children-and-nested-documents/
+

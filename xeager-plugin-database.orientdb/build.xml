@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project basedir="." default="build" name="xeager-plugin-database.orientdb">
+
+	<!-- Current version we are working towards -->
+	<property name="version" value="1.0" />
+	<property name="project" value="xeager-plugin-database.orientdb" />
+
+	<!-- Paths -->
+	<property name="bar" value="${basedir}/dist" />
+	<property name="dist" value="${basedir}/lib" />
+	<property name="bin" value="${basedir}/bin" />
+
+	<!-- Build -->
+	<target name="build">
+		<jar jarfile="${project}.jar">
+			<manifest>
+				<attribute name="Version" value="${version}" />
+			</manifest>
+			<fileset dir="${bin}/">
+				<include name="**/*.*" />
+			</fileset>
+		</jar>
+		<copy file="${project}.jar" todir="${dist}" />
+		<delete file="${project}.jar" />
+		<zip destfile="${bar}/${project}.xpl">
+			<zipfileset dir="${dist}" prefix="lib"/>
+			<fileset dir="." includes="descriptor.json"/>
+			<fileset dir="." includes="orientdb/**"/>
+		</zip>
+		<delete file="lib/${project}.jar" />
+	</target>
+</project>

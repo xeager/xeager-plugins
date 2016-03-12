@@ -1,0 +1,12 @@
+{
+	"name": "cluster",
+	"spi": {
+		"class": "com.xeager.platform.server.plugins.cluster.ClusterPlugin",
+		"properties": {
+			"group": {
+				"address": "224.2.2.3", 
+				"port": "9999"
+			} 
+		}
+	}
+}	

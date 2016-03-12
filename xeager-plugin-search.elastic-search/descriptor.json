@@ -1,0 +1,13 @@
+{
+	"name": "search.elastic-search",
+	"spi": {
+		"class": "com.xeager.platform.server.plugins.search.SearchPlugin",
+		"properties": {
+			"config": {
+				"cluster.name": "wishever.es",
+				"km.help": "put elasticsearch config here. For dev, not required, for prod, need to set node.client to true since ES will be a set of separate master/data nodes"	
+			},
+			"async": "false"
+		}
+	}
+}
