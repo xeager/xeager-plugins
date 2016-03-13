@@ -1,6 +1,5 @@
 package com.xeager.platform.plugins.cluster;
 
-import java.io.File;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -37,7 +36,7 @@ public class ClusterPlugin extends AbstractPlugin {
 	private JsonObject group;
 	
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 		join ();		
 	}
 	

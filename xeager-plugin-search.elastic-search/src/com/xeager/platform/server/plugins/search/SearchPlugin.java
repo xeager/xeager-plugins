@@ -54,7 +54,7 @@ public class SearchPlugin extends AbstractPlugin {
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 		
 		config.set (PathConf, home.getAbsolutePath ());
 

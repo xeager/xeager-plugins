@@ -74,7 +74,7 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 	private String				feature;
 	
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 		
 		Feature aFeature = Database.class.getAnnotation (Feature.class);
 		if (aFeature == null || Lang.isNullOrEmpty (aFeature.name ())) {

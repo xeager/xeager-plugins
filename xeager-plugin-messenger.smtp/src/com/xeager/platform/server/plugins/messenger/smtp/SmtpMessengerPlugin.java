@@ -1,6 +1,5 @@
 package com.xeager.platform.server.plugins.messenger.smtp;
 
-import java.io.File;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
@@ -52,7 +51,7 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 	private String feature;
 	
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 		
 		Feature aFeature = Messenger.class.getAnnotation (Feature.class);
 		if (aFeature == null || Lang.isNullOrEmpty (aFeature.name ())) {

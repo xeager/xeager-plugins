@@ -9,7 +9,6 @@ import org.apache.commons.io.monitor.FileAlterationObserver;
 
 import com.xeager.platform.plugins.impls.AbstractPlugin;
 import com.xeager.platform.server.ApiServer;
-import com.xeager.platform.server.utils.ConfigKeys;
 
 public class WatchdogPlugin extends AbstractPlugin {
 
@@ -18,11 +17,11 @@ public class WatchdogPlugin extends AbstractPlugin {
 	private int watchPeriod = 5;
 	
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 
         final long pollingInterval = watchPeriod * 1000;
 
-        File folder = new File (home.getParent (), ConfigKeys.Folders.Spaces);
+        File folder = new File (home.getParent (), "spaces");
 
         FileAlterationObserver observer = new FileAlterationObserver (folder);
         FileAlterationMonitor monitor = new FileAlterationMonitor (pollingInterval);

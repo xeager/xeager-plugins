@@ -20,7 +20,7 @@ public class LocalStoragePlugin extends AbstractPlugin {
 	private File 	fRoot;
 	
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 		
 		if (Lang.isNullOrEmpty (root)) {
 			fRoot = new File (new File (System.getProperty ("user.home")), "xeager/storage");

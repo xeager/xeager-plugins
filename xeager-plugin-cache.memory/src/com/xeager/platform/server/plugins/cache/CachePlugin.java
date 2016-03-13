@@ -1,6 +1,5 @@
 package com.xeager.platform.server.plugins.cache;
 
-import java.io.File;
 import java.util.Set;
 
 import com.xeager.platform.api.ApiSpace;
@@ -18,7 +17,7 @@ public class CachePlugin extends AbstractPlugin {
 	private Cache cache = new MemoryCache ();
 	
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 		server.addFeature (new PluginFeature () {
 			private static final long serialVersionUID = 3585173809402444745L;
 			@Override

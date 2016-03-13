@@ -61,7 +61,7 @@ public class JettyHttpPlugin extends AbstractPlugin {
 	private Server httpServer;
 	
 	@Override
-	public void init (final ApiServer server, File home) throws Exception {
+	public void init (final ApiServer server) throws Exception {
 		
 		Integer poolMax 			= Json.getInteger (pool, PoolMax, 200);
 		Integer poolMin 			= Json.getInteger (pool, PoolMin, 20);
@@ -170,6 +170,9 @@ public class JettyHttpPlugin extends AbstractPlugin {
 	
 	@Override
 	public void kill () {
+		if (httpServer == null) {
+			return;
+		}
 		try {
 			httpServer.stop ();
 		} catch (Exception e) {
