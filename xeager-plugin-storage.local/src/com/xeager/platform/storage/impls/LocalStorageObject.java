@@ -13,6 +13,7 @@ import java.util.Date;
 import com.xeager.platform.FileUtils;
 import com.xeager.platform.IOUtils;
 import com.xeager.platform.Lang;
+import com.xeager.platform.api.ApiContext;
 import com.xeager.platform.api.ApiOutput;
 import com.xeager.platform.api.ApiStreamSource;
 import com.xeager.platform.api.impls.DefaultApiStreamSource;
@@ -35,7 +36,7 @@ public class LocalStorageObject implements StorageObject {
 		this.source = source;
 		if (source.isFile () && source.getName ().lastIndexOf (Lang.DOT) >= 0) {
 			extension = source.getName ().substring (source.getName ().lastIndexOf (Lang.DOT) + 1);
-		}		
+		}	
 	}
 	
 	@Override
@@ -67,19 +68,35 @@ public class LocalStorageObject implements StorageObject {
 	}
 
 	@Override
-	public void pipe (OutputStream out) throws StorageException {
+	public InputStream reader (ApiContext context) throws StorageException {
 		if (isFolder ()) {
 			throw new StorageException (name () + " is a folder");
 		}
 		InputStream is = null;
 		try {
 			is = new FileInputStream (source);
-			IOUtils.copy (is, out);
 		} catch (IOException ioex) {
 			throw new StorageException (ioex.getMessage (), ioex);
-		} finally {
-			IOUtils.closeQuietly (is);
+		} 
+		RecyclableInputStream ris = new RecyclableInputStream (is);
+		context.addRecyclable (Lang.UUID (10), ris);
+		return ris;
+	}
+
+	@Override
+	public OutputStream writer (ApiContext context) throws StorageException {
+		if (isFolder ()) {
+			throw new StorageException (name () + " is a folder");
 		}
+		OutputStream os = null;
+		try {
+			os = new FileOutputStream (source);
+		} catch (IOException ioex) {
+			throw new StorageException (ioex.getMessage (), ioex);
+		} 
+		RecyclableOutputStream ros = new RecyclableOutputStream (os);
+		context.addRecyclable (Lang.UUID (10), ros);
+		return ros;
 	}
 
 	@Override
@@ -180,7 +197,7 @@ public class LocalStorageObject implements StorageObject {
 		if (Lang.isNullOrEmpty (name)) {
 			throw new StorageException ("invalid object name 'null'");
 		}
-		if (name.indexOf (Lang.SLASH) < 0) {
+		if (name.indexOf (Lang.SLASH) >= 0) {
 			throw new StorageException ("invalid object name '" + name + "'. It shouldn't contain a '/' (slash) character");
 		}
 	}

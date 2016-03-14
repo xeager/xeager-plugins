@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import com.xeager.platform.IOUtils;
+import com.xeager.platform.Lang;
 import com.xeager.platform.api.ApiStreamSource;
 import com.xeager.platform.storage.Folder;
 import com.xeager.platform.storage.StorageException;
@@ -37,8 +38,12 @@ public class LocalFolder extends LocalStorageObject implements Folder {
 	}
 
 	@Override
-	public StorageObject add (ApiStreamSource ss, String altName)
+	public StorageObject add (String altName, ApiStreamSource ss)
 			throws StorageException {
+		
+		if (Lang.isNullOrEmpty (altName) && ss == null) {
+			throw new StorageException ("object name is required");
+		}
 		
 		String name = altName != null ? altName : ss.name ();
 		
@@ -47,6 +52,15 @@ public class LocalFolder extends LocalStorageObject implements Folder {
 		File file = new File (source, name);
 		if (file.exists ()) {
 			throw new StorageException ("object '" + name + "' already exists under " + name ());
+		}
+		
+		if (ss == null) {
+			try {
+				file.createNewFile ();
+			} catch (IOException ioex) {
+				throw new StorageException (ioex.getMessage (), ioex);
+			}
+			return new LocalStorageObject (file);
 		}
 		
 		OutputStream os = null;

@@ -24,8 +24,6 @@ public class LocalStorage implements Storage {
 	@Override
 	public Folder root () throws StorageException {
 		return root;
-	}
-	
-	
+	}	
 
 }
