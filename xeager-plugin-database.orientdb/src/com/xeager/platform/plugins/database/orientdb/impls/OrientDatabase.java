@@ -153,6 +153,8 @@ public class OrientDatabase implements Database {
 			doc = new ODocument (type);
 		}
 		
+		boolean hasEntityField = false;
+
 		Set<String> changes = record.getChanges ();
 		
 		Iterator<String> keys = record.keys ();
@@ -165,6 +167,7 @@ public class OrientDatabase implements Database {
 				continue;
 			}
 			if (key.equalsIgnoreCase (Database.Fields.Entity)) {
+				hasEntityField = true;
 				continue;
 			}
 			
@@ -217,6 +220,10 @@ public class OrientDatabase implements Database {
 		
 		record.resetChanges ();
 		record.setInternal (doc);
+		
+		if (SchemalessEntity.class.isAssignableFrom (object.getClass ()) && hasEntityField) {
+			((SchemalessEntity)object).remove (Database.Fields.Entity);
+		}
 		
 		return doc.getIdentity ();
 		
