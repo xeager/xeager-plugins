@@ -491,21 +491,27 @@ public class OrientDatabase implements Database {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T> List<T> toList (Class<T> type, List<ODocument> documents, Visitor<T> visitor) {
+	private <T> List<T> toList (Class<?> type, List<ODocument> documents, Visitor<T> visitor) {
 		if (visitor == null) {
 			return new ODocumentList<T> (type, documents);
 		}
 		
+		if (type == null) {
+			type = SchemalessEntity.class;
+		}
+		
 		T t = null;
+		ODocumentProxy odp = null;
 		if (visitor.optimize ()) {
-			t = (T)new ODocumentProxy (type);
+			odp = new ODocumentProxy (type);
+			t = (T)Proxy.newProxyInstance (type.getClassLoader (), new Class<?> [] { type }, odp);
 		}
 		
 		for (ODocument document : documents) {
 			if (visitor.optimize ()) {
-				((ODocumentProxy)t).setDocument (document);
+				odp.setDocument (document);
 			} else {
-				t = (T)new ODocumentProxy (type);
+				t = (T)Proxy.newProxyInstance (type.getClassLoader (), new Class<?> [] { type }, new ODocumentProxy (type, document));
 			}
 			boolean cancel = visitor.onRecord (t);
 			if (cancel) {
@@ -560,8 +566,8 @@ public class OrientDatabase implements Database {
 			
 			CompiledQuery cQuery = compiler.compile (query);
 			
-			sQuery 		= (String)cache.get (CacheQueriesBucket, cacheKey, false);
-			bindings	= cQuery.bindings ();
+			sQuery 		= cQuery.query 		();
+			bindings	= cQuery.bindings 	();
 			
 			if (cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
 				cache.put (CacheQueriesBucket, cacheKey, sQuery, -1);
