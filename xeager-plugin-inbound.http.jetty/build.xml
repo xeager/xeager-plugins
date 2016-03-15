@@ -24,7 +24,7 @@
 		<delete file="${project}.jar" />
 		<zip destfile="${bar}/${project}.xpl">
 			<zipfileset dir="${dist}" prefix="lib"/>
-			<fileset dir="." includes="descriptor.json"/>
+			<fileset dir="." includes="plugin.json"/>
 			<fileset dir="." includes="xeager.jks"/>
 		</zip>
 		<delete file="lib/${project}.jar" />
