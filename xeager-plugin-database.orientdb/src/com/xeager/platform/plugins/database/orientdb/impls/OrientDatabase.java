@@ -117,7 +117,7 @@ public class OrientDatabase implements Database {
 	private ORID _put (Object object) throws DatabaseException {
 		
 		if (object == null) {
-			throw new DatabaseException ("Can't store NULL object");
+			throw new DatabaseException ("can't store NULL objects");
 		}
 		
 		if (!Proxy.isProxyClass (object.getClass ())) {
@@ -230,23 +230,17 @@ public class OrientDatabase implements Database {
 	}
 
 	@Override
-	public <T> void increment (Class<T> cls, String id, String field, int value) throws DatabaseException {
-		increment (getType (cls), id, field, value);
-
-	}
-	@Override
-	public <T> void increment (String eType, String id, String field, int value) throws DatabaseException {
+	public <T> void increment (Object object, String field, int value) throws DatabaseException {
 		
-		eType = checkNotNull (eType);
-		
-		if (!db.getMetadata ().getSchema ().existsClass (eType)) {
-			throw new DatabaseException ("type " + eType + " not found. The Store should be created prior calling increment");
+		ODocument doc = getParsistentObject (object);
+		if (doc == null) {
+			throw new DatabaseException ("object not found in database");
 		}
 		
-		String query = format (Lang.replace (IncrementQuery, Tokens.Value, String.valueOf (value)), eType, field);
+		String query = format (Lang.replace (IncrementQuery, Tokens.Value, String.valueOf (value)), doc.getClassName (), field);
 		
 		Map<String, Object> params = new HashMap<String, Object> ();
-		params.put (Fields.Uuid, id);
+		params.put (Fields.Uuid, doc.field (Fields.Uuid));
 		
 		db.command (new OCommandSQL (query)).execute (params);
 	}
@@ -388,6 +382,35 @@ public class OrientDatabase implements Database {
 	@Override
 	public JsonObject describe () {
 		return new JsonObject ();
+	}
+	
+	private ODocument getParsistentObject (Object object) throws DatabaseException {
+		if (object == null) {
+			throw new DatabaseException ("can't store NULL objects");
+		}
+		
+		if (!Proxy.isProxyClass (object.getClass ())) {
+			throw new DatabaseException ("object " + object.getClass ().getSimpleName () + " is not a database object");
+		}
+		
+		BeanProxy record = (BeanProxy)Proxy.getInvocationHandler (object);
+		
+		ODocument doc = (ODocument)record.getInternal ();
+		
+		String type = getType (record);
+		
+		if (doc == null) {
+			// it's a map proxy with an uuid
+			if (record.contains (Fields.Uuid)) {
+				doc = _get (type, (String)record.get (Fields.Uuid, null, null));
+			} 
+		} else {
+			// get the persistent record
+			if (!doc.getIdentity ().isPersistent () && record.contains (Fields.Uuid)) {
+				doc = _get (type, (String)record.get (Fields.Uuid, null, null));
+			}
+		}
+		return doc;
 	}
 
 	private void addRemove (String queryTpl, Object parent, String collection, Object child)
