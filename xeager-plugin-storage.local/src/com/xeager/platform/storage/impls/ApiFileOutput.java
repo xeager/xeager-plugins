@@ -10,67 +10,63 @@ import java.util.Date;
 
 import com.xeager.platform.IOUtils;
 import com.xeager.platform.Lang;
-import com.xeager.platform.api.ApiContentTypes;
 import com.xeager.platform.api.ApiOutput;
-import com.xeager.platform.api.media.MediaTypeUtils;
 import com.xeager.platform.json.JsonObject;
+import com.xeager.platform.storage.StorageException;
 import com.xeager.platform.storage.StorageObject;
 
 public class ApiFileOutput implements ApiOutput {
 
 	private static final long serialVersionUID = -4371715321710893775L;
 	
-	protected File file;
-	protected String name;
-	protected String contentType;
+	private StorageObject 	object;
+	private String 			name;
+	private String 			contentType;
 	
-	public ApiFileOutput (File file, String name, String contentType) {
-		this.file = file;
-		if (!Lang.isNullOrEmpty (name)) {
-			this.name = name;
-		} else {
-			this.name = file.getName ();
-		}
-		if (!Lang.isNullOrEmpty (contentType)) {
-			this.contentType = contentType;
-		} else {
-			if (!file.isFile ()) {
-				this.contentType = ApiContentTypes.Json;
-			}
-			this.contentType = MediaTypeUtils.getMediaForFile (extension ());
-		}
+	public ApiFileOutput (StorageObject object, String altName, String altContentType) {
+		this.object 		= object;
+		this.name 			= altName;
+		this.contentType 	= altContentType;
 	}
 	
 	@Override
 	public JsonObject data () {
-		return (JsonObject)new JsonObject ()
-				.set (StorageObject.Fields.Name, name ())
-				.set (StorageObject.Fields.Timestamp, Lang.toUTC (timestamp ()))
-				.set (StorageObject.Fields.Size, length ())
-				.set (StorageObject.Fields.ContentType, contentType ());
+		try {
+			return object.toJson ();
+		} catch (StorageException e) {
+			throw new RuntimeException (e.getMessage (), e);
+		}	
 	}
 
 	@Override
 	public long length () {
-		return file.length ();
+		try {
+			return object.length ();
+		} catch (StorageException e) {
+			throw new RuntimeException (e.getMessage (), e);
+		}	
 	}
 
 	@Override
 	public String name () {
-		return name;
+		if (!Lang.isNullOrEmpty (name)) {
+			return name;
+		}
+		return object.name ();
 	}
 
 	@Override
 	public String extension () {
-		if (!file.isFile () || file.getName ().lastIndexOf (Lang.DOT) <= 0) {
-			return null;
-		}		
-		return file.getName ().substring (file.getName ().lastIndexOf (Lang.DOT) + 1);
+		String name = object.name ();
+		return name.substring (name.lastIndexOf (Lang.DOT) + 1);
 	}
 
 	@Override
 	public String contentType () {
-		return contentType;
+		if (!Lang.isNullOrEmpty (contentType)) {
+			return contentType;
+		}
+		return object.contentType ();
 	}
 
 	@Override
@@ -86,11 +82,12 @@ public class ApiFileOutput implements ApiOutput {
 
 	@Override
 	public Date timestamp () {
-		return new Date (file.lastModified ());
+		return object.timestamp ();
 	}
 
 	@Override
 	public InputStream toInput () throws IOException {
+		File file = ((LocalStorageObject)object).getSource ();
 		if (file.isFile ()) {
 			return new FileInputStream (file);
 		} else {

@@ -94,6 +94,11 @@ public class LocalFolder extends LocalStorageObject implements Folder {
 	}
 
 	@Override
+	public boolean contains (String name) throws StorageException {
+		return new File (source, name).exists ();
+	}
+
+	@Override
 	public void list (Visitor visitor) throws StorageException {
 		if (visitor == null) {
 			return;
@@ -117,6 +122,15 @@ public class LocalFolder extends LocalStorageObject implements Folder {
 			throw new StorageException (e.getMessage (), e);
 		}
 
+	}
+
+	@Override
+	public long count () throws StorageException {
+		try {
+			return Files.list (source.toPath ()).count ();
+		} catch (IOException e) {
+			throw new StorageException (e.getMessage (), e);
+		}
 	}
 
 }

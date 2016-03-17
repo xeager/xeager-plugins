@@ -126,18 +126,22 @@ public class JettyHttpPlugin extends AbstractPlugin {
 	        	
 	        	private static final long serialVersionUID = -4391155835460802144L;
 	
+	        	@Override
 				protected void doGet (HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 	        		execute (req, resp);
 	        	}
 	
+	        	@Override
 	        	protected void doPost (HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 	        		execute (req, resp);
 	        	}
 	
+	        	@Override
 	        	protected void doPut (HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 	        		execute (req, resp);
 	        	}
 	
+	        	@Override
 	        	protected void doDelete (HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 	        		execute (req, resp);
 	        	}

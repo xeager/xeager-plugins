@@ -7,7 +7,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Date;
 
 import com.xeager.platform.FileUtils;
@@ -18,6 +20,8 @@ import com.xeager.platform.api.ApiOutput;
 import com.xeager.platform.api.ApiStreamSource;
 import com.xeager.platform.api.impls.DefaultApiStreamSource;
 import com.xeager.platform.api.media.MediaTypeUtils;
+import com.xeager.platform.json.JsonArray;
+import com.xeager.platform.json.JsonObject;
 import com.xeager.platform.storage.Folder;
 import com.xeager.platform.storage.StorageException;
 import com.xeager.platform.storage.StorageObject;
@@ -127,7 +131,7 @@ public class LocalStorageObject implements StorageObject {
 
 	@Override
 	public ApiOutput toOutput (String altName, String altContentType) throws StorageException {
-		return new ApiFileOutput (source, altName, altContentType);
+		return new ApiFileOutput (this, altName, altContentType);
 	}
 
 	@Override
@@ -170,6 +174,56 @@ public class LocalStorageObject implements StorageObject {
 		return MediaTypeUtils.getMediaForFile (this.extension);
 	}
 	
+	@Override
+	public JsonObject toJson () {
+		JsonObject data = (JsonObject)new JsonObject ()
+				.set (StorageObject.Fields.Name, name ())
+				.set (StorageObject.Fields.Timestamp, Lang.toUTC (timestamp ()));
+		try {
+			if (source.isFile ()) {
+				data.set (StorageObject.Fields.Length, length ())
+					.set (StorageObject.Fields.ContentType, contentType ());
+			}
+			
+			if (source.isDirectory ()) {
+				long count = ((Folder)source).count ();
+				data.set (ApiOutput.Defaults.Count, count);
+				
+				// get folder size in bytes
+			    long length = Files.walk (source.toPath ())
+			                     .filter (p -> p.toFile ().isFile ())
+			                     .mapToLong (p -> p.toFile ().length ())
+			                     .sum ();
+				data.set (StorageObject.Fields.Length, length);
+			    
+				// get files
+				if (count > 0) {
+						
+					final JsonArray items = new JsonArray ();
+					data.set (ApiOutput.Defaults.Items, items);
+					
+					LocalStorageObject so = new LocalStorageObject ();
+					Files.newDirectoryStream (
+						source.toPath (), 
+						new DirectoryStream.Filter<Path>() {
+							@Override
+							public boolean accept (Path p) throws IOException {
+								so.setSource (p.toFile ());
+								items.add (so.toJson ());
+								return false;
+							}
+						}
+					);
+				}
+
+			}
+		} catch (Exception ex) {
+			throw new RuntimeException (ex.getMessage (), ex);
+		}
+	
+		return data;	
+	}
+
 	protected File getSource () {
 		return source;
 	}
