@@ -49,4 +49,30 @@ public class WatchdogPlugin extends AbstractPlugin {
 	public void kill () {
 	}
 	
+	public static void main (String[] args) throws Exception {
+        final long pollingInterval = 2 * 1000;
+
+        File folder = new File ("/tmp/watch");
+
+        FileAlterationObserver observer = new FileAlterationObserver (folder);
+        FileAlterationMonitor monitor = new FileAlterationMonitor (pollingInterval);
+        
+        FileAlterationListener listener = new FileAlterationListenerAdaptor () {
+            @Override
+            public void onFileCreate (File file) {
+            	System.out.println ("(N)" + file);
+            }
+
+			@Override
+			public void onFileChange (File file) {
+				System.out.println ("(U)" + file);
+			}
+        };
+
+        observer.addListener (listener);
+        monitor.addObserver (observer);
+        monitor.start ();
+		
+	}
+	
 }

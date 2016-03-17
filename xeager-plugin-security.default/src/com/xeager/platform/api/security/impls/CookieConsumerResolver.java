@@ -26,7 +26,7 @@ public class CookieConsumerResolver implements ApiConsumerResolver {
 	}
 	
 	interface Spec {
-		String 	Cookie 				= "cookie";
+		String 	Name 				= "name";
 	}
 
 	@Override
@@ -40,7 +40,7 @@ public class CookieConsumerResolver implements ApiConsumerResolver {
 			return null;
 		}
 		
-		String cookieName = Json.getString (oResolver, Spec.Cookie, Defaults.Cookie);
+		String cookieName = Json.getString (oResolver, Spec.Name, Defaults.Cookie);
 
 		String token = null;
 		
