@@ -1,16 +1,15 @@
 package com.xeager.platform.cache.impls;
 
 import com.xeager.platform.Lang;
-import com.xeager.platform.api.ApiAccessDeniedException;
 import com.xeager.platform.api.ApiSpace;
-import com.xeager.platform.api.impls.ApiSpaceImpl;
 import com.xeager.platform.cache.Cache;
-import com.xeager.platform.json.JsonArray;
 import com.xeager.platform.json.JsonObject;
 
 public class CacheProxy implements Cache {
 
 	private static final long serialVersionUID = 5793242779066926179L;
+	
+	private static final String BucketsBucket = "__Buckets_Bucket";
 	
 	private Cache 	proxy;
 	private String 	spaceNs;
@@ -25,6 +24,11 @@ public class CacheProxy implements Cache {
 	@Override
 	public void create (String bucket, long ttl) {
 		proxy.create (prefix + bucket, ttl);
+		JsonObject oBucketsBucket = proxy.get (BucketsBucket, 0, -1);
+		if (oBucketsBucket == null) {
+			create (BucketsBucket, -1);
+		}
+		put (BucketsBucket, bucket, 1, -1);
 	}
 
 	@Override
@@ -40,6 +44,7 @@ public class CacheProxy implements Cache {
 	@Override
 	public void drop (String bucket) {
 		proxy.drop (prefix + bucket);
+		delete (BucketsBucket, bucket);
 	}
 
 	@Override
@@ -58,11 +63,8 @@ public class CacheProxy implements Cache {
 	}
 
 	@Override
-	public JsonArray list () throws ApiAccessDeniedException {
-		if (!spaceNs.equals (ApiSpaceImpl.Spaces.Sys)) {
-			throw new ApiAccessDeniedException ("Access denied");
-		}
-		return proxy.list ();
+	public JsonObject list () {
+		return proxy.get (BucketsBucket, 0, -1);
 	}
 
 	@Override

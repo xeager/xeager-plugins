@@ -1,19 +1,14 @@
 package com.xeager.platform.cache.impls;
 
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.xeager.platform.api.ApiAccessDeniedException;
 import com.xeager.platform.cache.Cache;
-import com.xeager.platform.json.JsonArray;
 import com.xeager.platform.json.JsonObject;
 
 public class MemoryCache implements Cache {
 	
 	private static final long serialVersionUID = -6790675915953439241L;
-	
-	private static final String Name = "name";
 	
 	private Map<String, Bucket> buckets = new ConcurrentHashMap<String, Bucket> ();
 
@@ -82,24 +77,15 @@ public class MemoryCache implements Cache {
 	}
 
 	@Override
-	public JsonArray list () throws ApiAccessDeniedException {
-		if (buckets.isEmpty ()) {
-			return JsonArray.Blank; 
-		}
-		JsonArray arr = new JsonArray ();
-		Iterator<String> keys = buckets.keySet ().iterator ();
-		while (keys.hasNext ()) {
-			String bucket = keys.next ();
-			arr.add (buckets.get (bucket).toJson ().set (Name, bucket));
-		}
-		return arr;
+	public JsonObject list () {
+		throw new UnsupportedOperationException ("list is not supported by the memory cache spi");
 	}
 
 	@Override
 	public JsonObject get (String bucket, int start, int page) {
 		Bucket b = buckets.get (bucket);
 		if (b == null) {
-			return JsonObject.Blank;
+			return null;
 		}
 		return b.toJson (true);
 	}

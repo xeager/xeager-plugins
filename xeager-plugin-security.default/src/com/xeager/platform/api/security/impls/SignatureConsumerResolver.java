@@ -93,6 +93,25 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 	public ApiConsumer authorize (Api api, ApiService service, ApiRequest request, ApiConsumer consumer)
 			throws ApiAuthenticationException {
 		
+		Object oExpiryDate = consumer.get (ApiConsumer.Fields.ExpiryDate);
+		if (oExpiryDate != null) {
+			Date expiryDate = null;
+			if (oExpiryDate instanceof Date) {
+				expiryDate = (Date)oExpiryDate;
+			} else if (oExpiryDate instanceof String) {
+				try {
+					expiryDate = Lang.toDate ((String)oExpiryDate, Lang.DEFAULT_DATE_FORMAT);
+				} catch (Exception ex) { 
+					throw new ApiAuthenticationException (ex.getMessage (), ex);
+				}
+			} else {
+				throw new ApiAuthenticationException ("unsupported expiry date format found on cunsumer " + oExpiryDate.getClass ());
+			}
+			if (expiryDate.before (new Date ())) {
+				throw new ApiAuthenticationException ("No timestamp specified");
+			}
+		}
+		
 		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName);
 		
 		long 	validity 		= Json.getLong 		(oResolver, Spec.Validity, Defaults.Validity) * 60 * 1000;
