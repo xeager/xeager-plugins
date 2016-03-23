@@ -3,9 +3,12 @@ package com.xeager.platform.server.plugins.storage.local;
 import java.io.File;
 import java.util.Set;
 
+import com.xeager.platform.Feature;
+import com.xeager.platform.Json;
 import com.xeager.platform.Lang;
 import com.xeager.platform.api.ApiSpace;
 import com.xeager.platform.json.JsonArray;
+import com.xeager.platform.json.JsonObject;
 import com.xeager.platform.plugins.PluginFeature;
 import com.xeager.platform.plugins.impls.AbstractPlugin;
 import com.xeager.platform.server.ApiServer;
@@ -22,9 +25,17 @@ public class LocalStoragePlugin extends AbstractPlugin {
 	
 	private Set<String> providers;
 	
+	private String 	feature;
+	
 	@Override
 	public void init (final ApiServer server) throws Exception {
 		
+		Feature aFeature = Storage.class.getAnnotation (Feature.class);
+		if (aFeature == null || Lang.isNullOrEmpty (aFeature.name ())) {
+			return;
+		}
+		feature = aFeature.name ();
+
 		if (Lang.isNullOrEmpty (root)) {
 			fRoot = new File (new File (System.getProperty ("user.home")), "xeager/storage");
 		} else {
@@ -83,18 +94,29 @@ public class LocalStoragePlugin extends AbstractPlugin {
 			return;
 		}
 		
+		ApiSpace space = (ApiSpace)target;
+		
+		File spaceStorage = null;
 		switch (event) {
 			case Create:
-				File spaceStorage = new File (fRoot, ((ApiSpace)target).getNamespace ());
+				spaceStorage = new File (fRoot, space.getNamespace ());
 				if (!spaceStorage.exists ()) {
 					spaceStorage.mkdir ();
 				}
 				break;
 			case AddFeature:
-				// if it's storage and provider is 'platform' create factory
+				// if it's storage and provider is 'platform' create folder if not exists
+				JsonObject sFeature = Json.getObject (space.getFeatures (), feature);
+				if (sFeature == null || sFeature.isEmpty ()) {
+					return;
+				}
+				spaceStorage = new File (fRoot, space.getNamespace ());
+				if (!spaceStorage.exists ()) {
+					spaceStorage.mkdir ();
+				}
 				break;
 			case DeleteFeature:
-				// if it's storage and provider is 'platform' --> maybe DO NOTHING
+				// NOTHING TO BE DONE. Should keep the space folder
 				
 				break;
 			default:

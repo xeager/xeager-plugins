@@ -2,6 +2,8 @@ package com.xeager.platform.api.security.impls;
 
 import java.text.ParseException;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 
@@ -12,10 +14,14 @@ import com.xeager.platform.api.ApiHeaders;
 import com.xeager.platform.api.ApiRequest;
 import com.xeager.platform.api.ApiRequest.Scope;
 import com.xeager.platform.api.ApiService;
+import com.xeager.platform.api.ApiSpace;
 import com.xeager.platform.api.security.ApiAuthenticationException;
 import com.xeager.platform.api.security.ApiConsumer;
 import com.xeager.platform.api.security.ApiConsumerResolver;
 import com.xeager.platform.api.security.ApiConsumerResolverAnnotation;
+import com.xeager.platform.db.Database;
+import com.xeager.platform.db.SchemalessEntity;
+import com.xeager.platform.db.query.impls.JsonQuery;
 import com.xeager.platform.json.JsonObject;
 import com.xeager.platform.server.security.impls.DefaultApiConsumer;
 
@@ -29,15 +35,21 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 	private static final Logger logger = Logger.getLogger (SignatureConsumerResolver.class);
 
 	interface Defaults {
-		String 	Application 		= "Bearer";
+		String 	Scheme 				= "Bearer";
 		long 	Validity 			= 5;
 		String 	TimestampHeader 	= ApiHeaders.Timestamp;
 	}
 	
 	interface Spec {
-		String 	Application 		= "application";
+		String 	Scheme 				= "scheme";
 		String 	Validity 			= "validity";
 		String 	TimestampHeader 	= "timestampHeader";
+		interface Auth {
+			String 	Feature 		= "feature";
+			String 	Query 			= "query";
+			String 	AccessKeyField	= "accessKeyField";
+			String 	SecretKeyField	= "secretKeyField";
+		}
 	}
 
 	@Override
@@ -46,7 +58,7 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		
 		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName);
 		
-		String 	application 	= Json.getString 	(oResolver, Spec.Application, Defaults.Application);
+		String 	application 	= Json.getString 	(oResolver, Spec.Scheme, Defaults.Scheme);
 
 		String auth = (String)request.get (ApiHeaders.Authorization, Scope.Header);
 		
@@ -69,13 +81,11 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		String accessKeyAndSignature = pair [1];
 		if (Lang.isNullOrEmpty (accessKeyAndSignature)) {
 			return null;
-			//throw new ApiAuthenticationException ("Unsigned request. Signature is missing");
 		}
 		
 		int indexOfEquals = accessKeyAndSignature.indexOf (Lang.COLON);
 		if (indexOfEquals <= 0) {
 			return null;
-			//throw new ApiAuthenticationException ("Invalid request. Wrong signature encoding");
 		}
 
 		String accessKey 	= accessKeyAndSignature.substring (0, indexOfEquals);
@@ -114,7 +124,7 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		
 		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName);
 		
-		long 	validity 		= Json.getLong 		(oResolver, Spec.Validity, Defaults.Validity) * 60 * 1000;
+		long 	validity 		= Json.getLong 		(oResolver, Spec.Validity, Defaults.Validity) * 1000;
 		String 	timestampHeader = Json.getString 	(oResolver, Spec.TimestampHeader, Defaults.TimestampHeader);
 		
 		String accessKey = (String)consumer.get (ApiConsumer.Fields.AccessKey);
@@ -122,9 +132,9 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 			throw new ApiAuthenticationException ("Invalid request. Invalid consumer " + accessKey);
 		}
 
-		String secretKey = (String)consumer.get (ApiConsumer.Fields.SecretKey);
-		if (Lang.isNullOrEmpty (secretKey)) {
-			throw new ApiAuthenticationException ("Invalid request. Invalid consumer " + accessKey);
+		String timestamp = (String)request.get (timestampHeader, Scope.Header);
+		if (Lang.isNullOrEmpty (timestamp)) {
+			throw new ApiAuthenticationException ("No timestamp specified");
 		}
 		
 		String signature = (String)consumer.get (ApiConsumer.Fields.Signature);
@@ -132,25 +142,28 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 			throw new ApiAuthenticationException ("Unsigned request");
 		}
 
-		String timestamp = (String)request.get (timestampHeader, Scope.Header);
-		if (Lang.isNullOrEmpty (timestamp)) {
-			throw new ApiAuthenticationException ("No timestamp specified");
+		String secretKey = (String)consumer.get (ApiConsumer.Fields.SecretKey);
+		if (Lang.isNullOrEmpty (secretKey)) {
+			secretKey = getSecretKey (api, request, accessKey);
+		}
+		if (Lang.isNullOrEmpty (secretKey)) {
+			throw new ApiAuthenticationException ("Invalid consumer " + accessKey);
 		}
 		
 		Date time;
 		try {
 			time = Lang.toUTC (timestamp);
 		} catch (ParseException e) {
-			throw new ApiAuthenticationException ("Wrong timestamp format. It should be like " + Lang.UTC_DATE_FORMAT);
+			throw new ApiAuthenticationException ("Bad timestamp format. Use UTC [" + Lang.UTC_DATE_FORMAT + "]");
 		}
 		
 		if (time == null) {
-			throw new ApiAuthenticationException ("Bad timestamp format. Use UTC [yyyy-MM-dd'T'HH:mm:ss'Z']");
+			throw new ApiAuthenticationException ("Bad timestamp format. Use UTC [" + Lang.UTC_DATE_FORMAT + "]");
 		}
 		
 		long elapsed = System.currentTimeMillis () - time.getTime ();
 		if (elapsed > validity) {
-			throw new ApiAuthenticationException ("Invalid request. Elapsed time must not exceed " + (validity/60000) + " minutes");
+			throw new ApiAuthenticationException ("Invalid request. Elapsed time must not exceed " + (validity/1000) + " seconds");
 		}
 
 		String calculated = null;
@@ -169,6 +182,47 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		
 		consumer.set (ApiConsumer.Fields.Anonymous, false);
 		return consumer;
+	}
+	
+	private String getSecretKey (Api api, ApiRequest request, String accessKey) throws ApiAuthenticationException {
+		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName), Api.Spec.Security.Auth);
+		if (auth == null || auth.isEmpty ()) {
+			return null;
+		}
+		
+		String 		feature = Json.getString (auth, Spec.Auth.Feature, ApiSpace.Features.Default);
+		JsonObject 	query 	= Json.getObject (auth, Spec.Auth.Query);
+		
+		if (query == null || query.isEmpty ()) {
+			return null;
+		}
+		
+		Map<String, Object> bindings = new HashMap<String, Object> ();
+		bindings.put (Spec.Auth.AccessKeyField, accessKey);
+		
+		JsonQuery q = new JsonQuery (query, bindings);
+		
+		SchemalessEntity odb = null;
+		try {
+			odb = (SchemalessEntity)api.space ().feature (Database.class, feature, request).findOne (null, q);
+		} catch (Exception ex) {
+			throw new ApiAuthenticationException (ex.getMessage (), ex);
+		}
+		
+		if (odb == null) {
+			throw new ApiAuthenticationException ("invalid accessKey " + accessKey);
+		}
+		
+		Object oSecretKey = odb.get (Spec.Auth.SecretKeyField);
+		
+		if (oSecretKey == null) {
+			throw new ApiAuthenticationException ("secret key not found for accessKey " + accessKey);
+		}
+
+		if (!(oSecretKey instanceof String)) {
+			throw new ApiAuthenticationException ("secret key not of a valid type");
+		}
+		return (String)oSecretKey;
 	}
 	
 }

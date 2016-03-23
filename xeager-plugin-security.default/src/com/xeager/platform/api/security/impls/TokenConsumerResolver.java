@@ -7,10 +7,12 @@ import com.xeager.platform.api.ApiHeaders;
 import com.xeager.platform.api.ApiRequest;
 import com.xeager.platform.api.ApiRequest.Scope;
 import com.xeager.platform.api.ApiService;
+import com.xeager.platform.api.ApiSpace;
 import com.xeager.platform.api.security.ApiAuthenticationException;
 import com.xeager.platform.api.security.ApiConsumer;
 import com.xeager.platform.api.security.ApiConsumerResolver;
 import com.xeager.platform.api.security.ApiConsumerResolverAnnotation;
+import com.xeager.platform.cache.Cache;
 import com.xeager.platform.json.JsonObject;
 import com.xeager.platform.server.security.impls.DefaultApiConsumer;
 
@@ -22,11 +24,16 @@ public class TokenConsumerResolver implements ApiConsumerResolver {
 	protected static final String MethodName = "token";
 
 	interface Defaults {
-		String 	Application 		= "Token";
+		String 	Scheme 		= "Token";
+		String 	Bucket 		= "tokens";
 	}
 	
 	interface Spec {
-		String 	Application 		= "application";
+		String 	Scheme 		= "scheme";
+		interface Auth {
+			String 	Feature = "feature";
+			String 	Bucket 	= "bucket";
+		}
 	}
 
 	public TokenConsumerResolver () {
@@ -38,7 +45,7 @@ public class TokenConsumerResolver implements ApiConsumerResolver {
 		
 		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName);
 		
-		String 	application 	= Json.getString 	(oResolver, Spec.Application, Defaults.Application);
+		String 	application 	= Json.getString 	(oResolver, Spec.Scheme, Defaults.Scheme);
 
 		String authHeader 	= (String)request.get (ApiHeaders.Authorization, Scope.Header);
 		if (Lang.isNullOrEmpty (authHeader)) {
@@ -65,6 +72,25 @@ public class TokenConsumerResolver implements ApiConsumerResolver {
 	@Override
 	public ApiConsumer authorize (Api api, ApiService service, ApiRequest request, ApiConsumer consumer)
 			throws ApiAuthenticationException {
+		
+		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName), Api.Spec.Security.Auth);
+		if (auth == null || auth.isEmpty ()) {
+			return consumer;
+		}
+		
+		String 	feature = Json.getString (auth, Spec.Auth.Feature, ApiSpace.Features.Default);
+		String 	bucket 	= api.getNamespace () + Lang.SLASH + Json.getString (auth, Spec.Auth.Bucket, Defaults.Bucket);
+		
+		JsonObject oConsumer = (JsonObject)api.space ().feature (Cache.class, feature, request).get (bucket, (String)consumer.get (ApiConsumer.Fields.Token), false);
+		
+		if (oConsumer == null) {
+			throw new ApiAuthenticationException ("invalid cookie");
+		}
+		
+		for (Object k : oConsumer.keySet ()) {
+			consumer.set (String.valueOf (k), oConsumer.get (k));
+		}
+		
 		return consumer;
 	}
 	

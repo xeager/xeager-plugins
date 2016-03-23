@@ -15,7 +15,6 @@ import com.xeager.platform.Json;
 import com.xeager.platform.Lang;
 import com.xeager.platform.Recyclable;
 import com.xeager.platform.api.ApiSpace;
-import com.xeager.platform.api.impls.ApiSpaceImpl;
 import com.xeager.platform.json.JsonArray;
 import com.xeager.platform.json.JsonObject;
 import com.xeager.platform.messaging.Messenger;
@@ -60,7 +59,7 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 			}
 			@Override
 			public Object get (ApiSpace space, String name) {
-				return ((RecyclableMessenger)((ApiSpaceImpl)space).getRecyclable (createKey (name))).messenger ();
+				return ((RecyclableMessenger)(space.getRecyclable (createKey (name)))).messenger ();
 			}
 			@Override
 			public Set<String> providers () {
@@ -75,17 +74,17 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 			return;
 		}
 		
-		if (event.equals (Event.Create)) {
-		} 
 		switch (event) {
 			case Create:
 				createSessions ((ApiSpace)target);
 				break;
 			case AddFeature:
 				// if it's Messenger and provider is 'smtp' create createSession
+				createSessions ((ApiSpace)target);
 				break;
 			case DeleteFeature:
 				// if it's Messenger and provider is 'smtp' shutdown session
+				dropSessions ((ApiSpace)target);
 				break;
 			default:
 				break;
@@ -105,6 +104,11 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 			String key = keys.next ();
 			String provider = Json.getString (msgFeature, ApiSpace.Features.Provider);
 			if (!providers.contains (provider)) {
+				continue;
+			}
+			
+			String sessionKey = createKey (key);
+			if (space.containsRecyclable (sessionKey)) {
 				continue;
 			}
 			
@@ -141,9 +145,30 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 				}
 			);
 			
-			((ApiSpaceImpl)space).addRecyclable (createKey (key), new RecyclableMessenger (new SmtpMessenger (user, session)));
+			space.addRecyclable (sessionKey, new RecyclableMessenger (new SmtpMessenger (user, session)));
 		}
 		
+	}
+	
+	private void dropSessions (ApiSpace space) {
+		
+		JsonObject msgFeature = Json.getObject (space.getFeatures (), feature);
+		
+		Set<String> recyclables = space.getRecyclables ();
+		for (String r : recyclables) {
+			if (!r.startsWith (feature + Lang.DOT)) {
+				continue;
+			}
+			String name = r.substring ((feature + Lang.DOT).length ());
+			if (msgFeature == null || msgFeature.containsKey (name)) {
+				// it's deleted
+				RecyclableMessenger rm = (RecyclableMessenger)space.getRecyclable (r);
+				// remove from recyclables
+				space.removeRecyclable (r);
+				// recycle
+				rm.recycle ();
+			}
+		}
 	}
 	
 	private String createKey (String name) {

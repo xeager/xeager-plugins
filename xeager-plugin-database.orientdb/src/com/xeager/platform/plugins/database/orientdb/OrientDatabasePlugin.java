@@ -17,7 +17,6 @@ import com.xeager.platform.Lang;
 import com.xeager.platform.Recyclable;
 import com.xeager.platform.api.ApiContext;
 import com.xeager.platform.api.ApiSpace;
-import com.xeager.platform.api.impls.ApiSpaceImpl;
 import com.xeager.platform.api.impls.DefaultApiContext;
 import com.xeager.platform.cache.Cache;
 import com.xeager.platform.db.Database;
@@ -133,10 +132,11 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 				break;
 			case AddFeature:
 				// if it's database and provider is 'platform or orientdb' create factory
+				createFactories ((ApiSpace)target);
 				break;
 			case DeleteFeature:
 				// if it's database and provider is 'platform or orientdb' stop factory
-				
+				dropFactories ((ApiSpace)target);
 				break;
 			default:
 				break;
@@ -170,6 +170,9 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 				database = _default;
 			}
 			OrientGraphFactory factory = createFactory (key, space, provider, database);
+			if (factory == null) {
+				continue;
+			}
 			if (ApiSpace.FeatureProviders.Platform.equals (provider)) {
 				ODatabaseDocumentTx db = null;
 				try {
@@ -186,9 +189,35 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 		}
 	}
 	
+	private void dropFactories (ApiSpace space) {
+		
+		JsonObject dbFeature = Json.getObject (space.getFeatures (), feature);
+		
+		Set<String> recyclables = space.getRecyclables ();
+		for (String r : recyclables) {
+			if (!r.startsWith (feature + Lang.DOT)) {
+				continue;
+			}
+			String name = r.substring ((feature + Lang.DOT).length ());
+			if (dbFeature == null || dbFeature.containsKey (name)) {
+				// it's deleted
+				RecyclableFactory rf = (RecyclableFactory)space.getRecyclable (r);
+				// remove from recyclables
+				space.removeRecyclable (r);
+				// recycle
+				rf.recycle ();
+			}
+		}
+		
+	}
+	
 	private OrientGraphFactory createFactory (String name, ApiSpace space, String provider, JsonObject database) {
 		
 		String factoryKey = createFactoryKey  (name, space);
+		
+		if (space.containsRecyclable (factoryKey)) {
+			return null;
+		}
 		
 		JsonObject pool = Json.getObject (database, Spec.Pool);
 		if (pool == null) {
@@ -208,7 +237,7 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 		OrientGraphFactory factory = new OrientGraphFactory (createUrl (name, space, provider, database), Json.getString (database, Spec.User), Json.getString (database, Spec.Password));
 		factory.setupPool (poolMin, poolMax);
 		
-		((ApiSpaceImpl)space).addRecyclable (factoryKey, new RecyclableFactory (factory));
+		space.addRecyclable (factoryKey, new RecyclableFactory (factory));
 		
 		return factory;
 		
@@ -279,7 +308,7 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 	}
 
 	public ODatabaseDocumentTx acquire (ApiSpace space, String name) {
-		return ((RecyclableFactory)((ApiSpaceImpl)space).getRecyclable (createFactoryKey (name, space))).factory ().getDatabase ();
+		return ((RecyclableFactory)space.getRecyclable (createFactoryKey (name, space))).factory ().getDatabase ();
 	}
 	
 	class RecyclableFactory implements Recyclable {

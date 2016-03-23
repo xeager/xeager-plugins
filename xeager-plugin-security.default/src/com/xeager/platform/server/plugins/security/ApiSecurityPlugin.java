@@ -13,10 +13,10 @@ public class ApiSecurityPlugin extends AbstractPlugin {
 
 	@Override
 	public void init (final ApiServer server) throws Exception {
-		server.addConsumerResolver (new BasicConsumerResolver ());
 		server.addConsumerResolver (new TokenConsumerResolver ());
-		server.addConsumerResolver (new SignatureConsumerResolver ());
 		server.addConsumerResolver (new CookieConsumerResolver ());
+		server.addConsumerResolver (new SignatureConsumerResolver ());
+		server.addConsumerResolver (new BasicConsumerResolver ());
 	}	
 
 	@Override

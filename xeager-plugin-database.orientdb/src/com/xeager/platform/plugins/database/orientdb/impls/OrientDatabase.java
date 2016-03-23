@@ -515,12 +515,12 @@ public class OrientDatabase implements Database {
 	
 	@SuppressWarnings("unchecked")
 	private <T> List<T> toList (Class<?> type, List<ODocument> documents, Visitor<T> visitor) {
-		if (visitor == null) {
-			return new ODocumentList<T> (type, documents);
-		}
-		
 		if (type == null) {
 			type = SchemalessEntity.class;
+		}
+		
+		if (visitor == null) {
+			return new ODocumentList<T> (type, documents);
 		}
 		
 		T t = null;
