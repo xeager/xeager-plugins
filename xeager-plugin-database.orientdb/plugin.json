@@ -10,6 +10,7 @@
 	"spi": {
 		"class": "com.xeager.platform.plugins.database.orientdb.OrientDatabasePlugin",
 		"properties": {
+			"providers": ["platform", "orientdb"],
 			"server": "config/orientdb-server-config.xml",
 			"default": {
 				"user": "admin",

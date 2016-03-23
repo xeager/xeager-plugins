@@ -3,6 +3,7 @@
 	"spi": {
 		"class": "com.xeager.platform.server.plugins.messenger.smtp.SmtpMessengerPlugin",
 		"properties": {
+			"providers": ["platform", "orientdb"],
 			"mimeTypes": [
 				"text/html;; x-java-content-handler=com.sun.mail.handlers.text_html",  
 				"text/xml;; x-java-content-handler=com.sun.mail.handlers.text_xml",

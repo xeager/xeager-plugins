@@ -3,6 +3,7 @@
 	"spi": {
 		"class": "com.xeager.platform.server.plugins.storage.local.LocalStoragePlugin",
 		"properties": {
+			"providers": ["platform"],
 			"async": "false"
 		}
 	}

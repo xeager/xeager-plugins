@@ -1,6 +1,9 @@
 {
 	"name": "cache.memory",
 	"spi": {
-		"class": "com.xeager.platform.server.plugins.cache.CachePlugin"
+		"class": "com.xeager.platform.server.plugins.cache.CachePlugin",
+		"properties": {
+			"providers": ["platform"]
+		}
 	}
 }	

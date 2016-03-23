@@ -6,6 +6,7 @@ import com.xeager.platform.api.ApiSpace;
 import com.xeager.platform.cache.Cache;
 import com.xeager.platform.cache.impls.CacheProxy;
 import com.xeager.platform.cache.impls.MemoryCache;
+import com.xeager.platform.json.JsonArray;
 import com.xeager.platform.plugins.PluginFeature;
 import com.xeager.platform.plugins.impls.AbstractPlugin;
 import com.xeager.platform.server.ApiServer;
@@ -15,6 +16,8 @@ public class CachePlugin extends AbstractPlugin {
 	private static final long serialVersionUID = 3203657740159783537L;
 	
 	private Cache cache = new MemoryCache ();
+	
+	private Set<String> providers;
 	
 	@Override
 	public void init (final ApiServer server) throws Exception {
@@ -30,7 +33,7 @@ public class CachePlugin extends AbstractPlugin {
 			}
 			@Override
 			public Set<String> providers () {
-				return AbstractPlugin.PlatformProider;
+				return providers;
 			}
 		});
 	}
@@ -39,4 +42,17 @@ public class CachePlugin extends AbstractPlugin {
 	public void kill () {
 	}
 	
+	public JsonArray getProviders () {
+		return null;
+	}
+
+	public void setProviders (JsonArray providers) {
+		if (providers == null) {
+			return;
+		}
+		for (Object o : providers) {
+			this.providers.add (o.toString ());
+		}
+	}
+
 }

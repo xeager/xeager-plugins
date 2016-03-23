@@ -1,7 +1,6 @@
 package com.xeager.platform.plugins.database.orientdb;
 
 import java.io.File;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -22,6 +21,7 @@ import com.xeager.platform.api.impls.ApiSpaceImpl;
 import com.xeager.platform.api.impls.DefaultApiContext;
 import com.xeager.platform.cache.Cache;
 import com.xeager.platform.db.Database;
+import com.xeager.platform.json.JsonArray;
 import com.xeager.platform.json.JsonObject;
 import com.xeager.platform.plugins.PluginFeature;
 import com.xeager.platform.plugins.database.orientdb.impls.OrientDatabase;
@@ -38,14 +38,6 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 	private static final ApiContext ZeroApiContext = new DefaultApiContext ();
 
 	private static final String DbPrefix 	= "db_";
-	
-	private static final Set<String> Providers = new HashSet<String> () {
-		private static final long serialVersionUID = -6219529665471192558L;
-		{
-			add ("orientdb");
-			add (ApiSpace.FeatureProviders.Platform);
-		}
-	};
 	
 	interface Spec {
 		String Host 	= "host";
@@ -73,6 +65,8 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 	
 	private String				feature;
 	
+	private Set<String> 		providers;
+	
 	@Override
 	public void init (final ApiServer server) throws Exception {
 		
@@ -99,10 +93,24 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 			}
 			@Override
 			public Set<String> providers () {
-				return Providers;
+				return providers;
 			}
 		});
 		
+	}
+	
+	
+	public JsonArray getProviders () {
+		return null;
+	}
+
+	public void setProviders (JsonArray providers) {
+		if (providers == null) {
+			return;
+		}
+		for (Object o : providers) {
+			this.providers.add (o.toString ());
+		}
 	}
 	
 	@Override
@@ -115,14 +123,24 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 		
 		ApiSpace space = (ApiSpace)target;
 		
-		if (event.equals (Event.Create)) {
-			createFactories ((ApiSpace)target);
-			Cache cache = space.feature (Cache.class, ApiSpace.Features.Default, ZeroApiContext);
-			if (!cache.exists (OrientDatabase.CacheQueriesBucket)) {
-				cache.create (OrientDatabase.CacheQueriesBucket, 0);
-			}
-		} 
-		// change event ...
+		switch (event) {
+			case Create:
+				createFactories ((ApiSpace)target);
+				Cache cache = space.feature (Cache.class, ApiSpace.Features.Default, ZeroApiContext);
+				if (!cache.exists (OrientDatabase.CacheQueriesBucket)) {
+					cache.create (OrientDatabase.CacheQueriesBucket, 0);
+				}
+				break;
+			case AddFeature:
+				// if it's database and provider is 'platform or orientdb' create factory
+				break;
+			case DeleteFeature:
+				// if it's database and provider is 'platform or orientdb' stop factory
+				
+				break;
+			default:
+				break;
+		}
 	}
 	
 	private void createFactories (ApiSpace space) {
@@ -140,7 +158,7 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 			String key = keys.next ();
 			JsonObject source = Json.getObject (dbFeature, key);
 			String provider = Json.getString (source, ApiSpace.Features.Provider);
-			if (!Providers.contains (provider)) {
+			if (!providers.contains (provider)) {
 				continue;
 			}
 			

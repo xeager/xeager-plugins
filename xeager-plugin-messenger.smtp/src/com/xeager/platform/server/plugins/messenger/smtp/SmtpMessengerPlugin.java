@@ -1,6 +1,5 @@
 package com.xeager.platform.server.plugins.messenger.smtp;
 
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
@@ -30,13 +29,6 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 
 	private static final long serialVersionUID = 3203657740159783537L;
 	
-	private static final Set<String> Providers = new HashSet<String> () {
-		private static final long serialVersionUID = -6219529665471192558L;
-		{
-			add ("smtp");
-		}
-	};
-	
 	interface Spec {
 		String Server 	= "server";
 		
@@ -48,6 +40,8 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 	private JsonArray mimeTypes;
 	
 	private String feature;
+	
+	private Set<String> providers;
 	
 	@Override
 	public void init (final ApiServer server) throws Exception {
@@ -70,7 +64,7 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 			}
 			@Override
 			public Set<String> providers () {
-				return Providers;
+				return providers;
 			}
 		});
 	}
@@ -82,9 +76,20 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 		}
 		
 		if (event.equals (Event.Create)) {
-			createSessions ((ApiSpace)target);
 		} 
-		// change event ...
+		switch (event) {
+			case Create:
+				createSessions ((ApiSpace)target);
+				break;
+			case AddFeature:
+				// if it's Messenger and provider is 'smtp' create createSession
+				break;
+			case DeleteFeature:
+				// if it's Messenger and provider is 'smtp' shutdown session
+				break;
+			default:
+				break;
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -99,7 +104,7 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 		while (keys.hasNext ()) {
 			String key = keys.next ();
 			String provider = Json.getString (msgFeature, ApiSpace.Features.Provider);
-			if (!Providers.contains (provider)) {
+			if (!providers.contains (provider)) {
 				continue;
 			}
 			
@@ -154,6 +159,20 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 	}
 	public void setMimeTypes (JsonArray mimeTypes) {
 		this.mimeTypes = mimeTypes;
+	}
+	
+	
+	public JsonArray getProviders () {
+		return null;
+	}
+
+	public void setProviders (JsonArray providers) {
+		if (providers == null) {
+			return;
+		}
+		for (Object o : providers) {
+			this.providers.add (o.toString ());
+		}
 	}
 	
 	class RecyclableMessenger implements Recyclable {
