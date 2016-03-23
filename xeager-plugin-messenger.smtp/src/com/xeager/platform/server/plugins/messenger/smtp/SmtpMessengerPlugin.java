@@ -34,7 +34,6 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 		private static final long serialVersionUID = -6219529665471192558L;
 		{
 			add ("smtp");
-			add (ApiSpace.FeatureProviders.Platform);
 		}
 	};
 	
