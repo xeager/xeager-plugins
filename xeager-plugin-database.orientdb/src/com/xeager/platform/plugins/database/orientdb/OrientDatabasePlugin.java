@@ -27,6 +27,7 @@ import com.xeager.platform.plugins.database.orientdb.impls.OrientDatabase;
 import com.xeager.platform.plugins.impls.AbstractPlugin;
 import com.xeager.platform.server.ApiServer;
 import com.xeager.platform.server.ApiServer.Event;
+import com.xeager.platform.server.FeatureNotFoundException;
 
 public class OrientDatabasePlugin extends AbstractPlugin {
 
@@ -88,7 +89,13 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 			}
 			@Override
 			public Object get (ApiSpace space, String name) {
-				return new OrientDatabase (space.feature (Cache.class, ApiSpace.Features.Default, ZeroApiContext), OrientDatabasePlugin.this.acquire (space, name));
+				Cache cache = null;
+				try {
+					cache = space.feature (Cache.class, ApiSpace.Features.Default, ZeroApiContext);
+				} catch (FeatureNotFoundException fnfex) {
+					// cache not provided
+				}
+				return new OrientDatabase (cache, OrientDatabasePlugin.this.acquire (space, name));
 			}
 			@Override
 			public Set<String> providers () {
@@ -125,8 +132,13 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 		switch (event) {
 			case Create:
 				createFactories ((ApiSpace)target);
-				Cache cache = space.feature (Cache.class, ApiSpace.Features.Default, ZeroApiContext);
-				if (!cache.exists (OrientDatabase.CacheQueriesBucket)) {
+				Cache cache = null;
+				try {
+					cache = space.feature (Cache.class, ApiSpace.Features.Default, ZeroApiContext);
+				} catch (FeatureNotFoundException fnfex) {
+					// cache not provided
+				}
+				if (cache != null && !cache.exists (OrientDatabase.CacheQueriesBucket)) {
 					cache.create (OrientDatabase.CacheQueriesBucket, 0);
 				}
 				break;

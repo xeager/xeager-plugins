@@ -10,12 +10,10 @@ import com.xeager.platform.api.ApiHeaders;
 import com.xeager.platform.api.ApiRequest;
 import com.xeager.platform.api.ApiRequest.Scope;
 import com.xeager.platform.api.ApiService;
-import com.xeager.platform.api.ApiSpace;
 import com.xeager.platform.api.security.ApiAuthenticationException;
 import com.xeager.platform.api.security.ApiConsumer;
 import com.xeager.platform.api.security.ApiConsumerResolver;
 import com.xeager.platform.api.security.ApiConsumerResolverAnnotation;
-import com.xeager.platform.db.Database;
 import com.xeager.platform.db.SchemalessEntity;
 import com.xeager.platform.db.query.impls.JsonQuery;
 import com.xeager.platform.encoding.Base64;
@@ -31,10 +29,14 @@ public class BasicConsumerResolver implements ApiConsumerResolver {
 	
 	protected static final String BasicAuth 	= "Basic";
 	
+	interface Defaults {
+		String 	LoginField = "email";
+	}
+	
 	interface Spec {
 		interface Auth {
-			String Feature 	= "feature";
-			String Query 	= "query";
+			String Feature 		= "feature";
+			String Query 		= "query";
 		}
 	}
 	
@@ -64,7 +66,7 @@ public class BasicConsumerResolver implements ApiConsumerResolver {
 		}
 		
 		ApiConsumer consumer = new DefaultApiConsumer (ApiConsumer.Type.Basic);
-		consumer.set (ApiConsumer.Fields.Uuid, aCredentials [0]);
+		consumer.set (ApiConsumer.Fields.Id, aCredentials [0]);
 		consumer.set (ApiConsumer.Fields.Password, aCredentials [1]);
 		
 		return consumer;
@@ -74,33 +76,39 @@ public class BasicConsumerResolver implements ApiConsumerResolver {
 	public ApiConsumer authorize (Api api, ApiService service, ApiRequest request, ApiConsumer consumer)
 			throws ApiAuthenticationException {
 		
-		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName), Api.Spec.Security.Auth);
+		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Schemes), MethodName), Api.Spec.Security.Auth);
 		if (auth == null || auth.isEmpty ()) {
 			return consumer;
 		}
 		
-		String 		feature = Json.getString (auth, Spec.Auth.Feature, ApiSpace.Features.Default);
-		JsonObject 	query 	= Json.getObject (auth, Spec.Auth.Query);
+		String 		feature 	= Json.getString (auth, Spec.Auth.Feature);
+		JsonObject 	query 		= Json.getObject (auth, Spec.Auth.Query);
 		
 		if (query == null || query.isEmpty ()) {
 			return consumer;
 		}
 		
 		Map<String, Object> bindings = new HashMap<String, Object> ();
-		bindings.put (ApiConsumer.Fields.Uuid, consumer.get (ApiConsumer.Fields.Uuid));
+		bindings.put (ApiConsumer.Fields.Id, consumer.get (ApiConsumer.Fields.Id));
 		bindings.put (ApiConsumer.Fields.Password, consumer.get (ApiConsumer.Fields.Password));
 		
 		JsonQuery q = new JsonQuery (query, bindings);
 		
 		SchemalessEntity odb = null;
 		try {
-			odb = (SchemalessEntity)api.space ().feature (Database.class, feature, request).findOne (null, q);
+			odb = (SchemalessEntity)api.database (request, feature).findOne (null, q);
 		} catch (Exception ex) {
 			throw new ApiAuthenticationException (ex.getMessage (), ex);
 		}
 		
+		boolean isServiceSecure = Json.getBoolean (service.getSecurity (), ApiService.Spec.Security.Enabled, true);
+		
 		if (odb == null) {
-			throw new ApiAuthenticationException ("invalid user/password");
+			if (isServiceSecure) {
+				throw new ApiAuthenticationException ("invalid user/password");
+			} else {
+				return consumer;
+			}
 		}
 		
 		JsonObject oConsumer = odb.toJson ();
@@ -108,6 +116,8 @@ public class BasicConsumerResolver implements ApiConsumerResolver {
 		for (Object k : oConsumer.keySet ()) {
 			consumer.set (String.valueOf (k), oConsumer.get (k));
 		}
+		
+		consumer.set (ApiConsumer.Fields.Anonymous, false);
 
 		return consumer;
 	}

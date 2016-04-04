@@ -14,12 +14,10 @@ import com.xeager.platform.api.ApiHeaders;
 import com.xeager.platform.api.ApiRequest;
 import com.xeager.platform.api.ApiRequest.Scope;
 import com.xeager.platform.api.ApiService;
-import com.xeager.platform.api.ApiSpace;
 import com.xeager.platform.api.security.ApiAuthenticationException;
 import com.xeager.platform.api.security.ApiConsumer;
 import com.xeager.platform.api.security.ApiConsumerResolver;
 import com.xeager.platform.api.security.ApiConsumerResolverAnnotation;
-import com.xeager.platform.db.Database;
 import com.xeager.platform.db.SchemalessEntity;
 import com.xeager.platform.db.query.impls.JsonQuery;
 import com.xeager.platform.json.JsonObject;
@@ -38,6 +36,8 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		String 	Scheme 				= "Bearer";
 		long 	Validity 			= 5;
 		String 	TimestampHeader 	= ApiHeaders.Timestamp;
+		String	AccessKey			= "uuid";
+		String	SecretKey			= "secretKey";
 	}
 	
 	interface Spec {
@@ -47,7 +47,6 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		interface Auth {
 			String 	Feature 		= "feature";
 			String 	Query 			= "query";
-			String 	AccessKeyField	= "accessKeyField";
 			String 	SecretKeyField	= "secretKeyField";
 		}
 	}
@@ -56,7 +55,7 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 	public ApiConsumer resolve (Api api, ApiService service, ApiRequest request)
 			throws ApiAuthenticationException {
 		
-		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName);
+		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Schemes), MethodName);
 		
 		String 	application 	= Json.getString 	(oResolver, Spec.Scheme, Defaults.Scheme);
 
@@ -103,26 +102,7 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 	public ApiConsumer authorize (Api api, ApiService service, ApiRequest request, ApiConsumer consumer)
 			throws ApiAuthenticationException {
 		
-		Object oExpiryDate = consumer.get (ApiConsumer.Fields.ExpiryDate);
-		if (oExpiryDate != null) {
-			Date expiryDate = null;
-			if (oExpiryDate instanceof Date) {
-				expiryDate = (Date)oExpiryDate;
-			} else if (oExpiryDate instanceof String) {
-				try {
-					expiryDate = Lang.toDate ((String)oExpiryDate, Lang.DEFAULT_DATE_FORMAT);
-				} catch (Exception ex) { 
-					throw new ApiAuthenticationException (ex.getMessage (), ex);
-				}
-			} else {
-				throw new ApiAuthenticationException ("unsupported expiry date format found on cunsumer " + oExpiryDate.getClass ());
-			}
-			if (expiryDate.before (new Date ())) {
-				throw new ApiAuthenticationException ("No timestamp specified");
-			}
-		}
-		
-		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName);
+		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Schemes), MethodName);
 		
 		long 	validity 		= Json.getLong 		(oResolver, Spec.Validity, Defaults.Validity) * 1000;
 		String 	timestampHeader = Json.getString 	(oResolver, Spec.TimestampHeader, Defaults.TimestampHeader);
@@ -144,10 +124,30 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 
 		String secretKey = (String)consumer.get (ApiConsumer.Fields.SecretKey);
 		if (Lang.isNullOrEmpty (secretKey)) {
-			secretKey = getSecretKey (api, request, accessKey);
+			secretKey = getSecretKey (api, request, consumer, accessKey);
 		}
+		
 		if (Lang.isNullOrEmpty (secretKey)) {
 			throw new ApiAuthenticationException ("Invalid consumer " + accessKey);
+		}
+		
+		Object oExpiryDate = consumer.get (ApiConsumer.Fields.ExpiryDate);
+		if (oExpiryDate != null) {
+			Date expiryDate = null;
+			if (oExpiryDate instanceof Date) {
+				expiryDate = (Date)oExpiryDate;
+			} else if (oExpiryDate instanceof String) {
+				try {
+					expiryDate = Lang.toDate ((String)oExpiryDate, Lang.DEFAULT_DATE_FORMAT);
+				} catch (Exception ex) { 
+					throw new ApiAuthenticationException (ex.getMessage (), ex);
+				}
+			} else {
+				throw new ApiAuthenticationException ("unsupported expiry date format found on cunsumer " + oExpiryDate.getClass ());
+			}
+			if (expiryDate.before (new Date ())) {
+				throw new ApiAuthenticationException ("No timestamp specified");
+			}
 		}
 		
 		Date time;
@@ -184,27 +184,28 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		return consumer;
 	}
 	
-	private String getSecretKey (Api api, ApiRequest request, String accessKey) throws ApiAuthenticationException {
-		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName), Api.Spec.Security.Auth);
+	private String getSecretKey (Api api, ApiRequest request, ApiConsumer consumer, String accessKey) throws ApiAuthenticationException {
+		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Schemes), MethodName), Api.Spec.Security.Auth);
 		if (auth == null || auth.isEmpty ()) {
 			return null;
 		}
 		
-		String 		feature = Json.getString (auth, Spec.Auth.Feature, ApiSpace.Features.Default);
-		JsonObject 	query 	= Json.getObject (auth, Spec.Auth.Query);
+		String 		feature 		= Json.getString (auth, Spec.Auth.Feature);
+		String 		secretKeyField 	= Json.getString (auth, Spec.Auth.SecretKeyField, Defaults.SecretKey);
+		JsonObject 	query 			= Json.getObject (auth, Spec.Auth.Query);
 		
 		if (query == null || query.isEmpty ()) {
 			return null;
 		}
 		
 		Map<String, Object> bindings = new HashMap<String, Object> ();
-		bindings.put (Spec.Auth.AccessKeyField, accessKey);
+		bindings.put (ApiConsumer.Fields.AccessKey, accessKey);
 		
 		JsonQuery q = new JsonQuery (query, bindings);
 		
 		SchemalessEntity odb = null;
 		try {
-			odb = (SchemalessEntity)api.space ().feature (Database.class, feature, request).findOne (null, q);
+			odb = (SchemalessEntity)api.database (request, feature).findOne (null, q);
 		} catch (Exception ex) {
 			throw new ApiAuthenticationException (ex.getMessage (), ex);
 		}
@@ -213,7 +214,7 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 			throw new ApiAuthenticationException ("invalid accessKey " + accessKey);
 		}
 		
-		Object oSecretKey = odb.get (Spec.Auth.SecretKeyField);
+		Object oSecretKey = odb.get (secretKeyField);
 		
 		if (oSecretKey == null) {
 			throw new ApiAuthenticationException ("secret key not found for accessKey " + accessKey);
@@ -222,6 +223,15 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		if (!(oSecretKey instanceof String)) {
 			throw new ApiAuthenticationException ("secret key not of a valid type");
 		}
+
+		JsonObject oConsumer = odb.toJson ();
+		
+		for (Object k : oConsumer.keySet ()) {
+			consumer.set (String.valueOf (k), oConsumer.get (k));
+		}
+		
+		consumer.set (ApiConsumer.Fields.Anonymous, false);
+
 		return (String)oSecretKey;
 	}
 	

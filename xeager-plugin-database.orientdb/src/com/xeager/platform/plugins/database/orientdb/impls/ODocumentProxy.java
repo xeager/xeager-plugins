@@ -94,13 +94,13 @@ public class ODocumentProxy extends BeanProxy {
 	@Override
 	public void set (String key, Object value) {
 		ODocument document = (ODocument)internal;
-		String 	uuid = (String)document.field (Database.Fields.Uuid);
+		String 	uuid = (String)document.field (Database.Fields.Id);
 		Date 	time = (Date)document.field (Database.Fields.Timestamp);
 		if (changes == null) {
 			
 			// creating a new document for update
 			document = new ODocument (document.getClassName (), document.getIdentity ());
-			document.field (Database.Fields.Uuid, uuid);
+			document.field (Database.Fields.Id, uuid);
 			document.field (Database.Fields.Timestamp, time);
 			internal = document;
 			

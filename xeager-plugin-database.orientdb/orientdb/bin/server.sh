@@ -73,9 +73,19 @@ WWW_PATH=$ORIENTDB_HOME/www
 ORIENTDB_SETTINGS="-Dprofiler.enabled=true"
 JAVA_OPTS_SCRIPT="-Djna.nosys=true -XX:+HeapDumpOnOutOfMemoryError -Djava.awt.headless=true -Dfile.encoding=UTF8 -Drhino.opt.level=9"
 
-# ORIENTDB MAXIMUM HEAP. USE SYNTAX -Xmx<memory>, WHERE <memory> HAS THE TOTAL MEMORY AND SIZE UNIT. EXAMPLE: -Xmx512m
-MAXHEAP=-Xmx512m
-# ORIENTDB MAXIMUM DISKCACHE IN MB, EXAMPLE, ENTER -Dstorage.diskCache.bufferSize=8192 FOR 8GB
+# ORIENTDB memory options, default to 512 of heap.
+
+if [ -z "$ORIENTDB_OPTS_MEMORY" ] ; then
+    ORIENTDB_OPTS_MEMORY="-Xms512m -Xmx512m"
+fi
+
+#ORIENTDB MAXIMUM DISKCACHE IN MB, EXAMPLE, ENTER -Dstorage.diskCache.bufferSize=8192 FOR 8GB
 MAXDISKCACHE=""
 
-exec "$JAVA" $JAVA_OPTS $MAXHEAP $JAVA_OPTS_SCRIPT $ORIENTDB_SETTINGS $MAXDISKCACHE -Djava.util.logging.config.file="$LOG_FILE" -Dorientdb.config.file="$CONFIG_FILE" -Dorientdb.www.path="$WWW_PATH" -Dorientdb.build.number="UNKNOWN@r${buildNumber}; 2015-10-04 10:56:30+0000" -cp "$ORIENTDB_HOME/lib/orientdb-server-2.1.3.jar:$ORIENTDB_HOME/lib/*" $* com.orientechnologies.orient.server.OServerMain
+exec "$JAVA" $JAVA_OPTS $ORIENTDB_OPTS_MEMORY $JAVA_OPTS_SCRIPT $ORIENTDB_SETTINGS $MAXDISKCACHE \
+    -Djava.util.logging.config.file="$LOG_FILE" \
+    -Dorientdb.config.file="$CONFIG_FILE" \
+    -Dorientdb.www.path="$WWW_PATH" \
+    -Dorientdb.build.number="2.1.x@r9bc1a54a4a62c4de555fc5360357f446f8d2bc84; 2016-03-14 17:00:05+0000" \
+    -cp "$ORIENTDB_HOME/lib/orientdb-server-2.1.13.jar:$ORIENTDB_HOME/lib/*" \
+    $* com.orientechnologies.orient.server.OServerMain

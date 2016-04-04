@@ -7,12 +7,10 @@ import com.xeager.platform.api.ApiHeaders;
 import com.xeager.platform.api.ApiRequest;
 import com.xeager.platform.api.ApiRequest.Scope;
 import com.xeager.platform.api.ApiService;
-import com.xeager.platform.api.ApiSpace;
 import com.xeager.platform.api.security.ApiAuthenticationException;
 import com.xeager.platform.api.security.ApiConsumer;
 import com.xeager.platform.api.security.ApiConsumerResolver;
 import com.xeager.platform.api.security.ApiConsumerResolverAnnotation;
-import com.xeager.platform.cache.Cache;
 import com.xeager.platform.json.JsonObject;
 import com.xeager.platform.server.security.impls.DefaultApiConsumer;
 
@@ -25,7 +23,7 @@ public class TokenConsumerResolver implements ApiConsumerResolver {
 
 	interface Defaults {
 		String 	Scheme 		= "Token";
-		String 	Bucket 		= "tokens";
+		String 	Bucket 		= "security.tokens";
 	}
 	
 	interface Spec {
@@ -43,7 +41,7 @@ public class TokenConsumerResolver implements ApiConsumerResolver {
 	public ApiConsumer resolve (Api api, ApiService service, ApiRequest request)
 			throws ApiAuthenticationException {
 		
-		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName);
+		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Schemes), MethodName);
 		
 		String 	application 	= Json.getString 	(oResolver, Spec.Scheme, Defaults.Scheme);
 
@@ -73,24 +71,32 @@ public class TokenConsumerResolver implements ApiConsumerResolver {
 	public ApiConsumer authorize (Api api, ApiService service, ApiRequest request, ApiConsumer consumer)
 			throws ApiAuthenticationException {
 		
-		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Methods), MethodName), Api.Spec.Security.Auth);
+		JsonObject auth = Json.getObject (Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Schemes), MethodName), Api.Spec.Security.Auth);
 		if (auth == null || auth.isEmpty ()) {
 			return consumer;
 		}
 		
-		String 	feature = Json.getString (auth, Spec.Auth.Feature, ApiSpace.Features.Default);
+		String 	feature = Json.getString (auth, Spec.Auth.Feature);
 		String 	bucket 	= api.getNamespace () + Lang.SLASH + Json.getString (auth, Spec.Auth.Bucket, Defaults.Bucket);
 		
-		JsonObject oConsumer = (JsonObject)api.space ().feature (Cache.class, feature, request).get (bucket, (String)consumer.get (ApiConsumer.Fields.Token), false);
+		JsonObject oConsumer = (JsonObject)api.cache (request, feature).get (bucket, (String)consumer.get (ApiConsumer.Fields.Token), false);
 		
+		boolean isServiceSecure = Json.getBoolean (service.getSecurity (), ApiService.Spec.Security.Enabled, true);
+
 		if (oConsumer == null) {
-			throw new ApiAuthenticationException ("invalid cookie");
+			if (isServiceSecure) {
+				throw new ApiAuthenticationException ("invalid token");
+			} else {
+				return consumer;
+			}
 		}
 		
 		for (Object k : oConsumer.keySet ()) {
 			consumer.set (String.valueOf (k), oConsumer.get (k));
 		}
-		
+
+		consumer.set (ApiConsumer.Fields.Anonymous, false);
+
 		return consumer;
 	}
 	

@@ -15,6 +15,7 @@ import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OClass.INDEX_TYPE;
+import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.impl.ODocument;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.sql.query.OSQLSynchQuery;
@@ -27,6 +28,7 @@ import com.xeager.platform.db.SchemalessEntity;
 import com.xeager.platform.db.query.Caching.Target;
 import com.xeager.platform.db.query.CompiledQuery;
 import com.xeager.platform.db.query.Query;
+import com.xeager.platform.db.query.Query.Operator;
 import com.xeager.platform.db.query.QueryCompiler;
 import com.xeager.platform.db.query.impls.SqlQueryCompiler;
 import com.xeager.platform.json.JsonObject;
@@ -40,7 +42,8 @@ public class OrientDatabase implements Database {
 	
 	private static final Logger 	logger 				= Logger.getLogger (OrientDatabase.class.getName ());
 	
-	public static final String		CacheQueriesBucket	=	"__plugin/database/odb/QueriesBucket__";	
+	public static final String		CacheQueriesBucket	= "__plugin/database/odb/QueriesBucket__";
+	private static final String 	Lucene 				= "LUCENE";
 	
 	private interface Tokens {
 		String Type 		= "{Type}";
@@ -56,13 +59,35 @@ public class OrientDatabase implements Database {
 		String Limit		= "limit";
 	}
 	
-	private static final String DeleteQuery 			= "delete from " + Tokens.Type + " where " + Fields.Uuid + " = :" + Fields.Uuid;
-	private static final String GetQuery 				= "select from " + Tokens.Type + " where " + Fields.Uuid + " = :" + Fields.Uuid;
+	private static final Map<IndexType, INDEX_TYPE> IndexTypes = new HashMap<IndexType, INDEX_TYPE> ();
+	static {
+		IndexTypes.put (IndexType.Unique, INDEX_TYPE.UNIQUE);
+		IndexTypes.put (IndexType.NotUnique, INDEX_TYPE.NOTUNIQUE);
+	}
+	
+	private static final Map<Field.Type, OType> FieldTypes = new HashMap<Field.Type, OType> ();
+	static {
+		FieldTypes.put (Field.Type.Boolean, OType.BOOLEAN);
+		FieldTypes.put (Field.Type.Byte, 	OType.BYTE);
+		FieldTypes.put (Field.Type.Binary, 	OType.BINARY);
+		FieldTypes.put (Field.Type.Short, 	OType.SHORT);
+		FieldTypes.put (Field.Type.Long, 	OType.LONG);
+		FieldTypes.put (Field.Type.Integer, OType.INTEGER);
+		FieldTypes.put (Field.Type.Double, 	OType.DOUBLE);
+		FieldTypes.put (Field.Type.Float, 	OType.FLOAT);
+		FieldTypes.put (Field.Type.Decimal, OType.DECIMAL);
+		FieldTypes.put (Field.Type.Date,	OType.DATE);
+		FieldTypes.put (Field.Type.DateTime,OType.DATETIME);
+		FieldTypes.put (Field.Type.String,	OType.STRING);
+	}
+	
+	private static final String DeleteQuery 			= "delete from " + Tokens.Type + " where " + Fields.Id + " = :" + Fields.Id;
+	private static final String GetQuery 				= "select from " + Tokens.Type + " where " + Fields.Id + " = :" + Fields.Id;
 
 	private static final String CollectionAddQuery 		= "update " + Tokens.Parent + " add " + Tokens.Collection + " = " + Tokens.Child;
 	private static final String CollectionRemoveQuery 	= "update " + Tokens.Parent + " remove " + Tokens.Collection + " = " + Tokens.Child;
 
-	private static final String IncrementQuery 			= "update " + Tokens.Type + " increment " + Tokens.Field + " = " + Tokens.Value + " where " + Fields.Uuid + " = :" + Fields.Uuid + " LOCK RECORD";
+	private static final String IncrementQuery 			= "update " + Tokens.Type + " increment " + Tokens.Field + " = " + Tokens.Value + " where " + Fields.Id + " = :" + Fields.Id + " LOCK RECORD";
 	
 	private Cache cache;
 	private ODatabaseDocumentTx db;
@@ -75,22 +100,55 @@ public class OrientDatabase implements Database {
 
 	@Override
 	public void createIndex (Class<?> entity, IndexType type, String name,
-			String... properties) throws DatabaseException {
-		createIndex (getType (entity), type, name, properties);
+			Field... fields) throws DatabaseException {
+		createIndex (getType (entity), type, name, fields);
 	}
 	@Override
 	public void createIndex (String eType, IndexType type, String name,
-			String... properties) throws DatabaseException {
+			Field... fields) throws DatabaseException {
 		
 		eType = checkNotNull (eType);
+		
+		if (fields == null || fields.length == 0) {
+			throw new DatabaseException ("entity " + eType + ". fields required to create an index");
+		}
 		
 		if (!db.getMetadata ().getSchema ().existsClass (eType)) {
 			throw new DatabaseException ("entity " + eType + " not found. The Store should be created prior indexing properties");
 		}
 		
-		OClass oClass = db.getMetadata ().getSchema ().getClass (eType);
+		boolean save = false;
 		
-		oClass.createIndex (eType + Lang.UNDERSCORE + name, type.equals (IndexType.Unique) ? INDEX_TYPE.UNIQUE : INDEX_TYPE.NOTUNIQUE, properties);
+		OClass oClass = db.getMetadata ().getSchema ().getClass (eType);
+		if (oClass == null) {
+			oClass = db.getMetadata ().getSchema ().createClass (eType);
+			save = true;
+		}
+		
+		String [] props = new String [fields.length];
+		
+		for (int i = 0; i < fields.length; i++) {
+			Field f = fields [i];
+			props [i] = f.name ();
+			if (f.type () != null) {
+				oClass.createProperty (f.name (), FieldTypes.get (f.type ()));
+			}
+		}
+		
+		switch (type) {
+			case Text:
+				oClass.createIndex (eType + Lang.DOT + name, "FULLTEXT", null, null, Lucene, props);
+				break;
+			case Spacial:
+				oClass.createIndex (eType + Lang.DOT + name, "SPATIAL", null, null, Lucene, props);
+				break;
+			default:
+				oClass.createIndex (eType + Lang.DOT + name, IndexTypes.get (type), props);
+				break;
+		}
+		if (save) {
+			db.getMetadata ().getSchema ().save ();
+		}
 	}
 
 	@Override
@@ -106,7 +164,7 @@ public class OrientDatabase implements Database {
 			return;
 		}
 		
-		db.getMetadata ().getIndexManager (). dropIndex (eType + Lang.UNDERSCORE + name);
+		db.getMetadata ().getIndexManager (). dropIndex (eType + Lang.DOT + name);
 	}
 
 	@Override
@@ -132,13 +190,13 @@ public class OrientDatabase implements Database {
 		
 		if (doc == null) {
 			// it's a map proxy with an uuid
-			if (record.contains (Fields.Uuid)) {
-				doc = _get (type, (String)record.get (Fields.Uuid, null, null));
+			if (record.contains (Fields.Id)) {
+				doc = _get (type, (String)record.get (Fields.Id, null, null));
 			} 
 		} else {
 			// get the persistent record
-			if (!doc.getIdentity ().isPersistent () && record.contains (Fields.Uuid)) {
-				doc = _get (type, (String)record.get (Fields.Uuid, null, null));
+			if (!doc.getIdentity ().isPersistent () && record.contains (Fields.Id)) {
+				doc = _get (type, (String)record.get (Fields.Id, null, null));
 			}
 		}
 		
@@ -160,7 +218,7 @@ public class OrientDatabase implements Database {
 		Iterator<String> keys = record.keys ();
 		while (keys.hasNext ()) {
 			String key = keys.next ();
-			if (update && key.equalsIgnoreCase (Fields.Uuid)) {
+			if (update && key.equalsIgnoreCase (Fields.Id)) {
 				continue;
 			}
 			if (update && (changes == null || !changes.contains (key))) {
@@ -204,11 +262,11 @@ public class OrientDatabase implements Database {
 			doc.field (key, value);
 			
 		}
-		if (!record.contains (Fields.Uuid)) {
+		if (!record.contains (Fields.Id)) {
 			EntityConfig dea = record.getType ().getAnnotation (EntityConfig.class);
 			String uuid = Lang.UUID (dea != null ? dea.idLength () : 20);
-			doc.field (Fields.Uuid, uuid);
-			record.set (Fields.Uuid, uuid);
+			doc.field (Fields.Id, uuid);
+			record.set (Fields.Id, uuid);
 		}
 		if (!record.contains (Fields.Timestamp)) {
 			Date timestamp = new Date ();
@@ -240,7 +298,7 @@ public class OrientDatabase implements Database {
 		String query = format (Lang.replace (IncrementQuery, Tokens.Value, String.valueOf (value)), doc.getClassName (), field);
 		
 		Map<String, Object> params = new HashMap<String, Object> ();
-		params.put (Fields.Uuid, doc.field (Fields.Uuid));
+		params.put (Fields.Id, doc.field (Fields.Id));
 		
 		db.command (new OCommandSQL (query)).execute (params);
 	}
@@ -295,7 +353,7 @@ public class OrientDatabase implements Database {
 		
 		String type = getType (record);
 
-		String id = (String)record.get (Database.Fields.Uuid, null, null);
+		String id = (String)record.get (Database.Fields.Id, null, null);
 		if (Lang.isNullOrEmpty (id)) {
 			throw new DatabaseException ("deleting an object requires an id");
 		}
@@ -307,7 +365,7 @@ public class OrientDatabase implements Database {
 		OCommandSQL command = new OCommandSQL (format (DeleteQuery, type));
 		
 		Map<String, Object> params = new HashMap<String, Object> ();
-		params.put (Fields.Uuid, id);
+		params.put (Fields.Id, id);
 		
 		return db.command (command).execute (params);
 		
@@ -401,13 +459,13 @@ public class OrientDatabase implements Database {
 		
 		if (doc == null) {
 			// it's a map proxy with an uuid
-			if (record.contains (Fields.Uuid)) {
-				doc = _get (type, (String)record.get (Fields.Uuid, null, null));
+			if (record.contains (Fields.Id)) {
+				doc = _get (type, (String)record.get (Fields.Id, null, null));
 			} 
 		} else {
 			// get the persistent record
-			if (!doc.getIdentity ().isPersistent () && record.contains (Fields.Uuid)) {
-				doc = _get (type, (String)record.get (Fields.Uuid, null, null));
+			if (!doc.getIdentity ().isPersistent () && record.contains (Fields.Id)) {
+				doc = _get (type, (String)record.get (Fields.Id, null, null));
 			}
 		}
 		return doc;
@@ -433,8 +491,8 @@ public class OrientDatabase implements Database {
 		
 		BeanProxy rParentRecord = (BeanProxy)Proxy.getInvocationHandler (parent);
 		parentDoc = (ODocument)rParentRecord.getInternal ();
-		if (parentDoc == null && rParentRecord.contains (Database.Fields.Uuid)) {
-			parentDoc = _get (getType (rParentRecord), (String)rParentRecord.get (Fields.Uuid, null, null));
+		if (parentDoc == null && rParentRecord.contains (Database.Fields.Id)) {
+			parentDoc = _get (getType (rParentRecord), (String)rParentRecord.get (Fields.Id, null, null));
 		}
 		if (parentDoc == null) {
 			throw new DatabaseException ("Parent Object " + parent.getClass ().getSimpleName () + " is not a persistent object");
@@ -442,8 +500,8 @@ public class OrientDatabase implements Database {
 		
 		BeanProxy rChildRecord = (BeanProxy)Proxy.getInvocationHandler (child);
 		childDoc = (ODocument)rChildRecord.getInternal ();
-		if (childDoc == null && rChildRecord.contains (Database.Fields.Uuid)) {
-			childDoc = _get (getType (rChildRecord), (String)rChildRecord.get (Fields.Uuid, null, null));
+		if (childDoc == null && rChildRecord.contains (Database.Fields.Id)) {
+			childDoc = _get (getType (rChildRecord), (String)rChildRecord.get (Fields.Id, null, null));
 		}
 		if (childDoc == null) {
 			throw new DatabaseException ("Child Object " + child.getClass ().getSimpleName () + " is not a persistent object");
@@ -475,7 +533,7 @@ public class OrientDatabase implements Database {
 				new OSQLSynchQuery<ODocument> (query, 1);
 		
 		Map<String, Object> params = new HashMap<String, Object> ();
-		params.put (Fields.Uuid, id);
+		params.put (Fields.Id, id);
 		
 		List<ODocument> result = db.command (q).execute (params);
 		if (result == null || result.isEmpty ()) {
@@ -563,7 +621,7 @@ public class OrientDatabase implements Database {
 		String 				sQuery 		= null;
 		Map<String, Object> bindings 	= query.bindings ();
 		
-		if (cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
+		if (cache != null && cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
 			sQuery 		= (String)cache.get (CacheQueriesBucket, cacheKey, false);
 		} 
 		
@@ -585,6 +643,13 @@ public class OrientDatabase implements Database {
 						buff.append (Lang.SPACE).append (Sql.Limit).append (Lang.SPACE).append (query.page ());
 					}
 				}
+				@Override
+				protected String operatorFor (Operator operator) {
+					if (Operator.ftq.equals (operator)) {
+						return Lucene;
+					}
+					return super.operatorFor (operator);
+				}
 			}; 
 			
 			CompiledQuery cQuery = compiler.compile (query);
@@ -592,7 +657,7 @@ public class OrientDatabase implements Database {
 			sQuery 		= cQuery.query 		();
 			bindings	= cQuery.bindings 	();
 			
-			if (cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
+			if (cache != null && cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
 				cache.put (CacheQueriesBucket, cacheKey, sQuery, -1);
 			} 
 		}
