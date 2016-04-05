@@ -410,7 +410,7 @@ public class OrientDatabase implements Database {
 		if (query == null) {
 			return 0;
 		}
-		Object result = _query (Query.Construct.delete, query);
+		Object result = _query (null, Query.Construct.delete, query);
 		if (result == null) {
 			return 0;
 		}
@@ -421,6 +421,7 @@ public class OrientDatabase implements Database {
 	public void recycle () {
 		if (db != null) {
 			logger.info ("Recycling database connection " + db);
+			db.activateOnCurrentThread ();
 			db.close ();
 		}
 	}
@@ -549,7 +550,7 @@ public class OrientDatabase implements Database {
 	public <T> List<T> find (Class<T> cls, Query query, Visitor<T> visitor) throws DatabaseException {
 		List<ODocument> result;
 		try {
-			result = (List<ODocument>)_query (Query.Construct.select, query);
+			result = (List<ODocument>)_query (getType (cls), Query.Construct.select, query);
 		} catch (Exception e) {
 			throw new DatabaseException (e.getMessage (), e);
 		}
@@ -602,17 +603,29 @@ public class OrientDatabase implements Database {
 		return null;
 	}
 
-	private Object _query (Query.Construct construct, Query query) throws DatabaseException {
+	private Object _query (String type, Query.Construct construct, final Query query) throws DatabaseException {
 		
 		if (query == null) {
 			return null;
 		}
 		
+		boolean queryHasEntity = true;
+		
 		String entity = query.entity ();
+		
+		if (Lang.isNullOrEmpty (entity)) {
+			queryHasEntity = false;
+			entity = type;
+		}
 		
 		entity = checkNotNull (entity);
 		
+		if (logger.isDebugEnabled ()) {
+			logger.debug ("Entity: " + entity);
+		}
+		
 		if (!db.getMetadata ().getSchema ().existsClass (entity)) {
+			logger.debug ("entity " + entity + " not found");
 			return null;
 		}
 		
@@ -621,11 +634,13 @@ public class OrientDatabase implements Database {
 		String 				sQuery 		= null;
 		Map<String, Object> bindings 	= query.bindings ();
 		
-		if (cache != null && cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
+		if (queryHasEntity && cache != null && cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
 			sQuery 		= (String)cache.get (CacheQueriesBucket, cacheKey, false);
+			logger.debug ("Query meta loaded from cache: " + sQuery);
 		} 
 		
 		if (sQuery == null) {
+			final String fEntity = entity;
 			QueryCompiler compiler = new SqlQueryCompiler (construct) {
 				private static final long serialVersionUID = -1248971549807669897L;
 
@@ -650,6 +665,11 @@ public class OrientDatabase implements Database {
 					}
 					return super.operatorFor (operator);
 				}
+				
+				@Override
+				protected void entity () {
+					buff.append (fEntity);
+				}
 			}; 
 			
 			CompiledQuery cQuery = compiler.compile (query);
@@ -657,15 +677,15 @@ public class OrientDatabase implements Database {
 			sQuery 		= cQuery.query 		();
 			bindings	= cQuery.bindings 	();
 			
-			if (cache != null && cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
+			if (queryHasEntity && cache != null && cache.exists (CacheQueriesBucket) && query.caching ().cache (Target.meta) && !Lang.isNullOrEmpty (query.name ())) {
 				cache.put (CacheQueriesBucket, cacheKey, sQuery, -1);
+				logger.debug ("Query meta stored in cache: " + sQuery);
 			} 
 		}
 		
-		
 		if (logger.isDebugEnabled ()) {
-			logger.debug ("   Query: \n" + sQuery);
-			logger.debug ("Bindings: \n" + bindings);
+			logger.debug ("   Query: " + sQuery);
+			logger.debug ("Bindings: " + bindings);
 		}
 		
 		if (Query.Construct.select.equals (construct)) {
@@ -706,6 +726,9 @@ public class OrientDatabase implements Database {
 			return null;
 		}
 		EntityConfig dea = cls.getAnnotation (EntityConfig.class);
+		if ((dea == null || Lang.isNullOrEmpty (dea.name ())) && cls.equals (SchemalessEntity.class)) {
+			return null;
+		}
 		return (dea != null && !Lang.isNullOrEmpty (dea.name ()) ? dea.name ().trim () : cls.getSimpleName ());
 	}
 

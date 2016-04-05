@@ -1,6 +1,7 @@
 package com.xeager.platform.server.plugins.storage.local;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.Set;
 
 import com.xeager.platform.Feature;
@@ -23,9 +24,9 @@ public class LocalStoragePlugin extends AbstractPlugin {
 	private String 	root;
 	private File 	fRoot;
 	
-	private Set<String> providers;
-	
 	private String 	feature;
+	
+	private Set<String> providers = new HashSet<String> ();
 	
 	@Override
 	public void init (final ApiServer server) throws Exception {

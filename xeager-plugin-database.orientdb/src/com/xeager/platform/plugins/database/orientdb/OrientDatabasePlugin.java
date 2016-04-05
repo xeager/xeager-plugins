@@ -1,6 +1,7 @@
 package com.xeager.platform.plugins.database.orientdb;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
@@ -65,7 +66,7 @@ public class OrientDatabasePlugin extends AbstractPlugin {
 	
 	private String				feature;
 	
-	private Set<String> 		providers;
+	private Set<String> 		providers = new HashSet<String> ();
 	
 	@Override
 	public void init (final ApiServer server) throws Exception {

@@ -20,8 +20,7 @@
 					"max": "100"
 				}
 			},
-			"closable": "false",
-			"async": "false"
+			"closable": "false"
 		}
 	}
 	

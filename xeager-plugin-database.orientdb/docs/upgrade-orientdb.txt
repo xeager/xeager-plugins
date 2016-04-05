@@ -1,0 +1,3 @@
+change orientdb-server-log.properties 
+	java.util.logging.FileHandler.pattern=plugins/xeager-plugin-database.orientdb/orientdb/logs/orient-server.log
+

@@ -4,7 +4,8 @@
 		"class": "com.xeager.platform.plugins.impls.jetty.JettyHttpPlugin",
 		"properties": {
 			"port": "80",
-			"context": "/"
+			"context": "/",
+			"async": "true"
 		}
 	}
 }	

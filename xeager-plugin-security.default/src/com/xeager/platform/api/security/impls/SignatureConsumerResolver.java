@@ -34,7 +34,7 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 
 	interface Defaults {
 		String 	Scheme 				= "Bearer";
-		long 	Validity 			= 5;
+		long 	Validity 			= 300;
 		String 	TimestampHeader 	= ApiHeaders.Timestamp;
 		String	AccessKey			= "uuid";
 		String	SecretKey			= "secretKey";
@@ -57,8 +57,8 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 		
 		JsonObject oResolver = Json.getObject (Json.getObject (api.getSecurity (), Api.Spec.Security.Schemes), MethodName);
 		
-		String 	application 	= Json.getString 	(oResolver, Spec.Scheme, Defaults.Scheme);
-
+		String 	scheme 	= Json.getString 	(oResolver, Spec.Scheme, Defaults.Scheme);
+		
 		String auth = (String)request.get (ApiHeaders.Authorization, Scope.Header);
 		
 		if (Lang.isNullOrEmpty (auth)) {
@@ -71,9 +71,9 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 			return null;
 		}
 		
-		String app = pair [0];
+		String rScheme = pair [0];
 
-		if (!app.equals (application)) {
+		if (!rScheme.equals (scheme)) {
 			return null;
 		}
 		
@@ -82,13 +82,13 @@ public class SignatureConsumerResolver implements ApiConsumerResolver {
 			return null;
 		}
 		
-		int indexOfEquals = accessKeyAndSignature.indexOf (Lang.COLON);
-		if (indexOfEquals <= 0) {
+		int indexOfColon = accessKeyAndSignature.indexOf (Lang.COLON);
+		if (indexOfColon <= 0) {
 			return null;
 		}
 
-		String accessKey 	= accessKeyAndSignature.substring (0, indexOfEquals);
-		String signature 	= accessKeyAndSignature.substring (indexOfEquals + 1);
+		String accessKey 	= accessKeyAndSignature.substring (0, indexOfColon);
+		String signature 	= accessKeyAndSignature.substring (indexOfColon + 1);
 		
 		ApiConsumer consumer = new DefaultApiConsumer (ApiConsumer.Type.Signature);
 		consumer.set (ApiConsumer.Fields.AccessKey, accessKey);

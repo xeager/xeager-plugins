@@ -5,6 +5,7 @@
 		"properties": {
 			"port": "8080",
 			"context": "/",
+			"async": "true",
 			"ssl": {
 				"port": "8443",
 				"keyStore": "xeager.jks",

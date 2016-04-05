@@ -1,5 +1,6 @@
 package com.xeager.platform.server.plugins.messenger.smtp;
 
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
@@ -40,7 +41,7 @@ public class SmtpMessengerPlugin extends AbstractPlugin {
 	
 	private String feature;
 	
-	private Set<String> providers;
+	private Set<String> providers = new HashSet<String> ();
 	
 	@Override
 	public void init (final ApiServer server) throws Exception {

@@ -11,6 +11,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Date;
+import java.util.stream.Stream;
 
 import com.xeager.platform.FileUtils;
 import com.xeager.platform.IOUtils;
@@ -37,10 +38,7 @@ public class LocalStorageObject implements StorageObject {
 	}
 	
 	public LocalStorageObject (File source) {
-		this.source = source;
-		if (source.isFile () && source.getName ().lastIndexOf (Lang.DOT) >= 0) {
-			extension = source.getName ().substring (source.getName ().lastIndexOf (Lang.DOT) + 1);
-		}	
+		setSource (source);
 	}
 	
 	@Override
@@ -176,6 +174,10 @@ public class LocalStorageObject implements StorageObject {
 	
 	@Override
 	public JsonObject toJson () {
+		return toJson (true);
+	}
+	
+	public JsonObject toJson (boolean fetchChildren) {
 		JsonObject data = (JsonObject)new JsonObject ()
 				.set (StorageObject.Fields.Name, name ())
 				.set (StorageObject.Fields.Timestamp, Lang.toUTC (timestamp ()));
@@ -186,34 +188,40 @@ public class LocalStorageObject implements StorageObject {
 			}
 			
 			if (source.isDirectory ()) {
-				long count = ((Folder)source).count ();
+				long count = new LocalFolder (source).count ();
 				data.set (ApiOutput.Defaults.Count, count);
 				
 				// get folder size in bytes
-			    long length = Files.walk (source.toPath ())
-			                     .filter (p -> p.toFile ().isFile ())
-			                     .mapToLong (p -> p.toFile ().length ())
-			                     .sum ();
-				data.set (StorageObject.Fields.Length, length);
-			    
+				Stream<Path> walkStream = null;
+				try {
+					walkStream = Files.walk (source.toPath ());
+				    long length = walkStream.filter (p -> p.toFile ().isFile ())
+             				.mapToLong (p -> p.toFile ().length ())
+             				.sum ();
+				    
+				    data.set (StorageObject.Fields.Length, length);
+				    
+				} finally {
+					if (walkStream != null) walkStream.close ();
+				}
+			    		
 				// get files
-				if (count > 0) {
-						
+				if (count > 0 && fetchChildren) {
 					final JsonArray items = new JsonArray ();
 					data.set (ApiOutput.Defaults.Items, items);
 					
 					LocalStorageObject so = new LocalStorageObject ();
-					Files.newDirectoryStream (
-						source.toPath (), 
-						new DirectoryStream.Filter<Path>() {
-							@Override
-							public boolean accept (Path p) throws IOException {
-								so.setSource (p.toFile ());
-								items.add (so.toJson ());
-								return false;
-							}
-						}
-					);
+					
+					DirectoryStream<Path> stream = null;
+					try {
+						stream = Files.newDirectoryStream (source.toPath ());
+						for (Path p: stream) {
+							so.setSource (p.toFile ());
+							items.add (so.toJson (false));
+					    }
+					} finally {
+						try { if (stream != null) stream.close (); } catch (IOException ex) {}
+					}
 				}
 
 			}
@@ -230,6 +238,10 @@ public class LocalStorageObject implements StorageObject {
 	
 	protected void setSource (File source) {
 		this.source = source;
+		int indexOfDot = source.getName ().lastIndexOf (Lang.DOT);
+		if (source.isFile () && indexOfDot >= 0) {
+			extension = source.getName ().substring (indexOfDot + 1);
+		}
 	}
 	
 	protected void validatePath (String path) throws StorageException {

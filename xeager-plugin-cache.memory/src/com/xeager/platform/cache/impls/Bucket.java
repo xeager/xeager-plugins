@@ -36,19 +36,36 @@ public class Bucket implements Serializable {
 	
 	public void clear () {
 		values.clear ();
-		values = null;
 	}
 
-	public JsonObject toJson (boolean withEntries) {
+	public JsonObject toJson (int start, int page) {
 		JsonObject o = (JsonObject)new JsonObject ().set (Ttl, ttl).set (Count, values.size ());
-		if (withEntries) {
-			return (JsonObject)o.set (Entries, new JsonObject (values));
+		if (values.isEmpty ()) {
+			return o;
+		}
+		if (page < 1) {
+			return o;
 		} 
-		return (JsonObject)new JsonObject ().set (Ttl, ttl).set (Count, values.size ());
+		
+		JsonObject entries = new JsonObject ();
+		o.set (Entries, entries);
+		
+		int counter = 0;
+		for (String k : values.keySet ()) {
+			if ((counter - start) > page) {
+				break;
+			}
+			if (counter < start) {
+				continue;
+			}
+			counter++;
+			entries.set (k, values.get (k));
+		}
+		return o;
 	}
 	
 	public JsonObject toJson () {
-		return toJson (false);
+		return toJson (0, 0);
 	}
 	
 }
