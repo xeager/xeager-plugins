@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project basedir="." default="build" name="xeager-plugin-cluster">
+<project basedir="." default="build" name="xeager-plugin-cluster.jgroups">
 
 	<!-- Current version we are working towards -->
 	<property name="version" value="1.0" />
-	<property name="project" value="xeager-plugin-cluster" />
+	<property name="project" value="xeager-plugin-cluster.jgroups" />
 
 	<!-- Paths -->
 	<property name="bar" value="${basedir}/dist" />

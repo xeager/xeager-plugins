@@ -1,0 +1,21 @@
+https://github.com/meltmedia/jgroups-aws
+
+http://jgroups.org/
+
+
+- create space
+	send to all the same command
+- push api
+	send to all the same command
+- db --> ok
+	already with hazelcast
+- cache --> JGroups ParttionedMap
+
+- mqtt queues should be clustered ?
+
+- wire ()
+	- create space
+	- install api 
+	- uninstall api
+	
+
